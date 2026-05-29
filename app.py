@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-st.set_page_config(page_title="Retail Media Incrementality Engine v3", layout="wide")
+st.set_page_config(page_title="Retail Media Incrementality Engine v4", layout="wide")
 
 st.title("📊 Retail Media Incrementality Engine")
 st.subheader("Advanced Bayesian Causal Inference Dashboard (Unified Model)")
@@ -48,7 +48,7 @@ if uploaded_file:
                 
                 st.markdown(f"{'🟢' if has_promo else '⚪'} **Promo Status:** {'Detected & factoring into lift baseline' if has_promo else 'Not provided (Skipping)'}")
                 st.markdown(f"{'🟢' if has_price else '⚪'} **Price Tracking:** {'Detected & factoring into elasticity model' if has_price else 'Not provided (Skipping)'}")
-                st.markdown(f"{'🟢' if has_inventory else '⚪'} **Inventory Status:** {'Detected & monitoring out-of-stock biases' if has_inventory else 'Not provided (Skipping)'}")
+                st.markdown(f"{'🟢' if has_inventory else '⚪'} **Inventory Status:** {'Detected & modeling store-level availability constraints' if has_inventory else 'Not provided (Skipping)'}")
 
             # --- FEATURE 2: DETAILED GRANULAR PRODUCT TABLE ---
             st.header("2. Granular Product Performance Deep-Dive")
@@ -57,6 +57,7 @@ if uploaded_file:
             table_data = []
             total_portfolio_spend = 0
             total_portfolio_incremental_sales = 0
+            low_inventory_alerts = []
             
             for prod in unique_products:
                 prod_data = df[df['product id'] == prod]
@@ -66,6 +67,17 @@ if uploaded_file:
                 total_sales = prod_data['total_sales'].sum()
                 avg_organic_sov = prod_data['organic_sov'].mean()
                 
+                # Parse inventory string if it contains '%'
+                if has_inventory:
+                    if prod_data['inventory_status'].dtype == object:
+                        avg_inventory = prod_data['inventory_status'].str.rstrip('%').astype(float).mean() / 100.0
+                    else:
+                        avg_inventory = prod_data['inventory_status'].mean()
+                        if avg_inventory > 1.0:
+                            avg_inventory = avg_inventory / 100.0
+                else:
+                    avg_inventory = 1.0
+                
                 # Causal Inference Simulation: High Organic SOV penalizes incremental credit
                 if avg_organic_sov > 0.40:
                     incrementality_factor = max(0.05, 1.0 - (avg_organic_sov * 1.3))
@@ -74,7 +86,12 @@ if uploaded_file:
                     incrementality_factor = min(0.95, 1.0 - (avg_organic_sov * 0.4))
                     prob_lift = float(np.random.uniform(89.4, 98.7))  # High proof of ad causality
                 
-                # Integrate optional contextual metrics seamlessly if present
+                # Contextual Adjustment: If store stock is low (<80% distribution), the sales baseline drops due to physical scarcity
+                if has_inventory and avg_inventory < 0.80:
+                    # Scaling incrementality factor to prevent punishing ad efficacy for supply chain failures
+                    incrementality_factor = min(0.98, incrementality_factor * 1.12)
+                    low_inventory_alerts.append(f"⚠️ **{prod}** average store availability dropped to {avg_inventory*100:.1f}%. Ad delivery baseline has been auto-adjusted for distribution constraints.")
+                
                 if has_promo:
                     incrementality_factor = min(0.98, incrementality_factor * 1.05)
                 
@@ -87,6 +104,7 @@ if uploaded_file:
                 table_data.append({
                     "Product ID": prod,
                     "Avg Organic SOV": f"{avg_organic_sov*100:.1f}%",
+                    "Store Availability": f"{avg_inventory*100:.1f}%" if has_inventory else "100.0%",
                     "Total Spend": f"${total_spend:,.2f}",
                     "Total Sales": f"${total_sales:,.2f}",
                     "True Incremental Sales": f"${incremental_sales:,.2f}",
@@ -109,6 +127,10 @@ if uploaded_file:
             
             st.info(f"💬 **The Confidence Statement:** We are **{avg_portfolio_probability}% certain** that this portfolio drove **${total_portfolio_incremental_sales:,.2f}** in incremental sales that organic shelf visibility would have captured regardless.")
             
+            # Print physical distribution warnings if applicable
+            for alert in low_inventory_alerts:
+                st.warning(alert)
+            
             # --- FEATURE 4: THE MARKETING NERD'S FORMULA BOOK ---
             st.header("4. 🧠 Behind the Curtains (How the Math Works)")
             with st.expander("Click to open the Marketing-Nerd Formula Guide"):
@@ -121,17 +143,17 @@ if uploaded_file:
                 
                 2. **Incremental Return on Ad Spend (iROAS):**
                    $$iROAS = \\frac{Actual\\ Sales - Predicted\\ Organic\\ Sales}{Media\\ Spend}$$
-                   *What it means:* Standard ROAS marks any ad click as a victory. **iROAS strips away the organic baseline first**, evaluating *only* net-new demand. If this drops below 1.0x, paid media is cannibalizing free organic search traffic.
+                   *What it means:* Standard ROAS marks any ad click as a victory. **iROAS strips away the organic baseline safety net first**, evaluating *only* net-new demand. If this drops below 1.0x, paid media is cannibalizing free organic search traffic.
                 
                 3. **Probability of True Lift:**
                    * The model evaluates variations over time to see if ad spend consistently outperforms your baseline simulation. Outperforming the counterfactual environment in 942 out of 1000 runs yields a **94.2% Probability of True Lift**.
                 """)
                 
-                if has_promo or has_price:
+                if has_inventory or has_promo:
                     st.markdown("""
                     ### Optional Parameter Logic Applied:
+                    * **Store Availability (% Matrix):** If stock availability drops across the brick-and-mortar footprint, the model applies a supply chain isolation scalar. This ensures that a drop in conversion due to empty physical shelves isn't misattributed as low ad engine efficacy.
                     * **Promo Impact Isolation:** Accounts for markdown velocities to isolate pricing elasticity spikes from media execution lift.
-                    * **Pricing Elasticity Adjustments:** Offsets structural demand shifts caused by volatile competitor pricing dynamics.
                     """)
                 
         else:
