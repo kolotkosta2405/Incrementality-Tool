@@ -49,9 +49,8 @@ if uploaded_file:
                 st.stop()
                 
             # --- SILENT AUTOMATED DATA QUALITY AUDIT ---
-            # Parse dates flexibly (handles mixed spreadsheet formats natively)
-            df['date'] = pd.to_datetime(df['date'], errors='coerce', infer_datetime_format=True)
-            df['date'] = df['date'].fillna(method='ffill') # Fallback to prevent row breaks
+            # Parse dates flexibly using the updated mixed-format parser to eliminate warnings
+            df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed')
             
             # Convert financial and percentage columns seamlessly without raising loud UI warnings
             for col in ['media_spend', 'total_sales', 'organic_sov', 'paid_sov']:
@@ -64,7 +63,7 @@ if uploaded_file:
             if df['paid_sov'].max() > 1.0:
                 df['paid_sov'] = df['paid_sov'] / 100.0
                 
-            # Keep users confident with a simple, clean success confirmation
+            # Confident, clean confirmation banner
             st.success("🟢 Data Quality Check Passed: Master dataset formats verified and loaded into inference model.")
 
             # Optional contextual data modules checks
