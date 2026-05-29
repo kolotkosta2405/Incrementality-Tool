@@ -16,14 +16,13 @@ st.sidebar.header("1. Upload Master Data Layer")
 uploaded_file = st.sidebar.file_uploader("Upload Unified Performance CSV (Multiple Products)", type=["csv"])
 
 def clean_numeric_column(series):
-    """Targets and removes specific currency markers like 'CA$' or '$', commas, and percent signs to parse clean numeric floats."""
+    """Bulletproof regex extraction. Ignores spaces, quotes, 'CA$', '$', and characters, pulling out ONLY raw digits and decimals."""
     if series.dtype == object:
-        cleaned = series.astype(str).str.strip()
-        # Explicitly remove regional prefixes, standard dollar signs, commas, and percentage marks
-        cleaned = cleaned.str.replace('CA$', '', regex=False)
-        cleaned = cleaned.str.replace('$', '', regex=False)
-        cleaned = cleaned.str.replace(',', '', regex=False)
-        cleaned = cleaned.str.replace('%', '', regex=False)
+        # Step 1: Force to string type
+        cleaned = series.astype(str)
+        # Step 2: Use regex to strip away absolutely everything EXCEPT numbers, dots, and negative signs
+        cleaned = cleaned.str.replace(r'[^\d\.\-]', '', regex=True)
+        # Step 3: Convert to a clean mathematical float decimal
         return pd.to_numeric(cleaned, errors='coerce')
     return pd.to_numeric(series, errors='coerce')
 
