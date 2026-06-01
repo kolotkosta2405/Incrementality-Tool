@@ -4,7 +4,7 @@ import numpy as np
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="Kepler Multi-Layer Strategy Engine v17", 
+    page_title="Kepler Multi-Layer Strategy Engine v18", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -31,25 +31,6 @@ def identify_macro_category(name_string):
             return category
     return "Other Shark Systems"
 
-def clean_cell_value(val):
-    """
-    RUTHLESS ELEMENT-WISE PARSER: Safely extracts purely numeric data 
-    regardless of whether Excel exported it as a float, integer, currency text, or string percentage.
-    """
-    if pd.isna(val):
-        return 0.0
-    if isinstance(val, (int, float)):
-        return float(val)
-    
-    # If it's a string text object, sanitize punctuation carefully
-    val_str = str(val).strip()
-    val_str = val_str.replace('$', '').replace(',', '').replace('%', '')
-    
-    try:
-        return float(val_str)
-    except ValueError:
-        return 0.0
-
 # --- SIDEBAR: ZERO-TOUCH INTELLIGENT DROP ZONE ---
 st.sidebar.header("1. Ingest Data Layers")
 uploaded_files = st.sidebar.file_uploader(
@@ -67,7 +48,6 @@ if uploaded_files:
             preview.columns = preview.columns.str.lower().str.strip()
             file.seek(0)
             
-            # Smart routing definitions based on column headers
             if 'spend' in preview.columns or 'cost' in preview.columns:
                 df_perf = pd.read_csv(file)
                 st.sidebar.success(f"📊 Performance: {file.name}")
@@ -102,12 +82,12 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
 
         df_perf['assigned_category'] = df_perf[line_item_col].apply(identify_macro_category)
         
-        # Apply the new cell-level math safety transformation
-        df_perf['clean_spend'] = df_perf[spend_col].apply(clean_cell_value)
-        df_perf['clean_sales'] = df_perf[sales_col].apply(clean_cell_value)
-        df_perf['clean_ntb'] = df_perf[ntb_col].apply(clean_cell_value)
+        # Pure numeric parsing without destructive string methods
+        df_perf['clean_spend'] = pd.to_numeric(df_perf[spend_col], errors='coerce').fillna(0.0)
+        df_perf['clean_sales'] = pd.to_numeric(df_perf[sales_col], errors='coerce').fillna(0.0)
+        df_perf['clean_ntb'] = pd.to_numeric(df_perf[ntb_col], errors='coerce').fillna(0.0)
         
-        # Guardrail check: If fractions are entered as whole percentages (e.g. 93.0 instead of 0.93)
+        # Dynamic scaler: handles both formats (0.93 or 93.0) seamlessly
         if df_perf['clean_ntb'].max() > 1.0: 
             df_perf['clean_ntb'] /= 100.0
 
@@ -117,8 +97,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
         if df_brand is not None:
             df_brand.columns = df_brand.columns.str.lower().str.strip()
             b_org_col = [c for c in df_brand.columns if 'organic' in c or 'sov' in c or 'share' in c][0]
-            df_brand['clean_sov'] = df_brand[b_org_col].apply(clean_cell_value)
-            # Normalization check for SOV tables
+            df_brand['clean_sov'] = pd.to_numeric(df_brand[b_org_col], errors='coerce').fillna(0.0)
             if df_brand['clean_sov'].max() > 1.0: df_brand['clean_sov'] /= 100.0
             brand_baseline = df_brand['clean_sov'].mean()
 
@@ -127,7 +106,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
             kw_label_col = [c for c in df_kw.columns if 'keyword' in c or 'term' in c][0]
             kw_org_col = [c for c in df_kw.columns if 'organic' in c or 'sov' in c or 'share' in c][0]
             df_kw['assigned_category'] = df_kw[kw_label_col].apply(identify_macro_category)
-            df_kw['clean_sov'] = df_kw[kw_org_col].apply(clean_cell_value)
+            df_kw['clean_sov'] = pd.to_numeric(df_kw[kw_org_col], errors='coerce').fillna(0.0)
             if df_kw['clean_sov'].max() > 1.0: df_kw['clean_sov'] /= 100.0
             kw_sov_dict = df_kw.groupby('assigned_category')['clean_sov'].mean().to_dict()
 
@@ -136,7 +115,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
             p_label_col = [c for c in df_prod.columns if 'product' in c or 'title' in c or 'asin' in c][0]
             p_org_col = [c for c in df_prod.columns if 'organic' in c or 'sov' in c or 'share' in c][0]
             df_prod['assigned_category'] = df_prod[p_label_col].apply(identify_macro_category)
-            df_prod['clean_sov'] = df_prod[p_org_col].apply(clean_cell_value)
+            df_prod['clean_sov'] = pd.to_numeric(df_prod[p_org_col], errors='coerce').fillna(0.0)
             if df_prod['clean_sov'].max() > 1.0: df_prod['clean_sov'] /= 100.0
             prod_sov_dict = df_prod.groupby('assigned_category')['clean_sov'].mean().to_dict()
 
@@ -173,15 +152,15 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
                 assigned_sov = prod_sov_dict[cat]
                 sov_source = "Product Tab Match (Max Precision)"
 
-            # Step 1: Run Logistic S-Curve Filter
+            # Step 1: Logistic S-Curve Cannibalization Filter
             s_curve_factor = 1.0 / (1.0 + np.exp(steepness * (assigned_sov - inflection_point)))
             base_incrementality = max(0.15, min(0.90, s_curve_factor))
             
-            # Step 2: Product Acquisition Scaling (NTB Layer)
+            # Step 2: Customer Acquisition Optimization Layer
             final_incrementality = base_incrementality + (avg_ntb * 0.05)
             final_incrementality = min(0.95, max(0.10, final_incrementality))
             
-            # Step 3: Financial Synthesis
+            # Step 3: Financial Calculations
             incremental_sales = sales * final_incrementality
             calculated_iroas = incremental_sales / spend if spend > 0 else 0
             
@@ -226,7 +205,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
         col2.metric("True Incremental Volume", f"${total_portfolio_incremental_sales:,.2f}")
         col3.metric("Blended Portfolio iROAS", f"{portfolio_iroas:.2f}x")
 
-        # --- DETAILED CATEGORY-BY-CATEGORY RECOMMENDATIONS ---
+        # --- DETAILED CATEGORY ACTION MODULES ---
         st.header("🎯 Deep Category Action Plans")
         rec_cols = st.columns(2)
         for idx, (cat, metrics) in enumerate(raw_metrics.items()):
@@ -253,6 +232,42 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
                         * **Analysis:** The media footprint is balanced. Incrementality factor is calculated at **{metrics['inc_factor']*100:.1f}%**, keeping efficiency stable without immediate signs of severe keyword fatigue.
                         * **Tactical Directive:** Maintain current run-rates. Optimize performance internally by adjusting line-item bid modifiers and refreshing creative concepts rather than making macro budget changes.
                         """)
+
+        # --- THE MATHEMATICAL CALCULATIONS APPENDIX ---
+        st.markdown("---")
+        st.header("🧮 Model Methodology & Causal Logic Appendix")
+        st.markdown(r"""
+        This dashboard replaces standard linear attribution models with a multi-layered causal framework designed to calculate **True Incremental Return on Ad Spend ($iROAS$)**. The model operates through a three-stage mathematical sequence applied to every rolled-up product category:
+
+        ### 1. The Non-Linear Organic Cannibalization Filter (S-Curve)
+        Paid media efficiency is fundamentally dependent on baseline organic shelf presence. To model how high organic Share of Voice ($SOV_{org}$) cannibalizes paid ad credit, we route the resolved organic share through a **Logistic S-Curve Decay Function**:
+        
+        $$f(SOV_{org}) = \frac{1}{1 + e^{k \cdot (SOV_{org} - x_0)}}$$
+        
+        *Where:*
+        * $x_0$ represent the **Inflection Point** (set via sidebar; defaults to $0.35$). This is the threshold where cannibalization begins accelerating.
+        * $k$ represents the **Decay Steepness** (set via sidebar). This controls how aggressively ad credit drops off as organic dominance nears $100\%$.
+        
+        This base factor is bounded between a baseline floor of $0.15$ and a ceiling of $0.90$ to account for standard baseline market velocity.
+
+        ### 2. New-To-Brand (NTB) Acquisition Scaling
+        To ensure the model rewards customer acquisition, we add an optimization layer linked to the category's average New-To-Brand sales percentage ($NTB\%$):
+        
+        $$\text{Final Incrementality Factor } (\alpha) = f(SOV_{org}) + (NTB\% \cdot 0.05)$$
+        
+        This final scalar $\alpha$ represents the true percentage of sales directly caused by your retail media spend, capped strictly at a maximum ceiling of $95\%$ and a absolute floor of $10\%$.
+
+        ### 3. Financial Synthesis & Guardrail Enforcement
+        Once the true incremental volume is isolated, the final metric values are synthesized via:
+        
+        $$\text{True Incremental Sales} = \text{Total Attributed Sales} \times \alpha$$
+        
+        $$iROAS = \frac{\text{True Incremental Sales}}{\text{Total Media Invested}}$$
+        
+        If low spend levels coupled with large organic volumes produce a volatile mathematical anomaly, the system enforces the **Executive Sanity Ceiling** ($Ceiling_{exec}$):
+        
+        $$\text{If } iROAS > Ceiling_{exec}, \text{ then } iROAS = Ceiling_{exec} \text{ and } \text{True Incremental Sales} = \text{Spend} \times Ceiling_{exec}$$
+        """)
 
     except Exception as e:
         st.error(f"❌ Processing Error Across Ingested Layers: {str(e)}")
