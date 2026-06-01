@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-st.set_page_config(page_title="Retail Media Incrementality Engine v7", layout="wide")
+st.set_page_config(page_title="Retail Media Incrementality Engine v8", layout="wide")
 
 st.title("📊 Retail Media Incrementality Engine")
 st.subheader("Advanced Bayesian Causal Inference Dashboard (Unified Model)")
@@ -51,7 +51,7 @@ if uploaded_file:
                 
             df.columns = df.columns.str.lower().str.strip()
             
-            # Upgraded core validation array checking for NTB column presence
+            # Core validation array checking for NTB column presence
             mandatory_cols = ['date', 'product id', 'media_spend', 'total_sales', 'organic_sov', 'paid_sov']
             missing_cols = [col for col in mandatory_cols if col not in df.columns]
             
@@ -98,6 +98,7 @@ if uploaded_file:
             
             unique_products = df['product id'].dropna().unique()
             table_data = []
+            raw_metrics = {} # Stores numeric metrics for building strategic recommendations later
             
             total_portfolio_spend = 0
             total_portfolio_incremental_sales = 0
@@ -109,12 +110,10 @@ if uploaded_file:
                 total_spend = float(prod_data['media_spend'].sum())
                 total_sales = float(prod_data['total_sales'].sum())
                 avg_organic_sov = float(prod_data['organic_sov'].mean())
+                avg_paid_sov = float(prod_data['paid_sov'].mean())
                 
                 # Formula Layer 1: The Non-Linear Logistic S-Curve Filter
-                # Formula: 1 / (1 + e^(k * (Organic_SOV - x₀)))
                 s_curve_factor = 1.0 / (1.0 + np.exp(steepness * (avg_organic_sov - inflection_point)))
-                
-                # Enforce realistic math floors (never true 100% lift, never true 0% lift)
                 incrementality_factor = max(0.10, min(0.95, s_curve_factor))
                 
                 # Formula Layer 2: Category-Aware NTB Elasticity Adjuster
@@ -122,15 +121,9 @@ if uploaded_file:
                 if has_ntb:
                     avg_ntb = float(prod_data['ntb_clean'].mean())
                     if "Consumables" in category_type:
-                        # For CPG: High NTB implies highly efficient conquest/acquisition. Reward strongly.
-                        # Scaling scalar adds up to +20% lift if NTB performance sits at 100%
                         incrementality_factor += (avg_ntb * 0.20)
                     else:
-                        # For Electronics: Naturally high NTB baselines are normal. Dampen heavily.
-                        # Only apply minor residual adjustment scaling (+5% max benefit)
                         incrementality_factor += (avg_ntb * 0.05)
-                        
-                    # Re-verify boundaries after adjustment
                     incrementality_factor = min(0.98, max(0.05, incrementality_factor))
                 
                 # Formula Layer 3: Contextual Supply Chain & Markdown Conditions
@@ -141,18 +134,29 @@ if uploaded_file:
                         incrementality_factor = min(0.98, incrementality_factor * 1.12)
                         low_inventory_alerts.append(f"⚠️ **{prod}** average distribution dropped to {avg_inventory:.1f}%. Ad baseline modified for out-of-stock anomalies.")
                 
+                is_promo_active = False
                 if has_promo:
-                    incrementality_factor = min(0.98, incrementality_factor * 1.05)
+                    promo_col = 'promo_status' if 'promo_status' in df.columns else 'promo_flag'
+                    is_promo_active = prod_data[promo_col].astype(str).str.lower().str.contains('active|yes|1').any()
+                    if is_promo_active:
+                        incrementality_factor = min(0.98, incrementality_factor * 1.05)
                 
                 # Execute Pure Financial Calculations
                 incremental_sales = total_sales * incrementality_factor
                 iroas = incremental_sales / total_spend if total_spend > 0 else 0
-                
-                # Certainty classification linked tightly to structural organic search contamination exposure
                 prob_lift = 98.4 if avg_organic_sov < 0.20 else (34.1 if avg_organic_sov > 0.55 else 71.2)
                 
                 total_portfolio_spend += total_spend
                 total_portfolio_incremental_sales += incremental_sales
+                
+                # Save data for recommendations parsing
+                raw_metrics[prod] = {
+                    'iroas': iroas,
+                    'spend': total_spend,
+                    'organic_sov': avg_organic_sov,
+                    'inventory': avg_inventory,
+                    'promo': is_promo_active
+                }
                 
                 table_data.append({
                     "Product ID": prod,
@@ -179,6 +183,51 @@ if uploaded_file:
             
             st.info(f"💬 **The Confidence Statement:** Based on non-linear S-curve processing adjusted for your customized **{category_type}** parameters, this profile isolated **${total_portfolio_incremental_sales:,.2f}** in direct net-new consumer demand.")
             
+            # --- NEW STRATEGIC MEDIA DIRECTIVES (RECOMMENDATIONS MODULE) ---
+            st.header("🎯 Strategic Media Directives")
+            
+            if len(raw_metrics) >= 2:
+                # Find best and worst products based on true incremental returns (iROAS)
+                sorted_prods = sorted(raw_metrics.items(), key=lambda item: item[1]['iroas'])
+                least_efficient_prod, least_eff_meta = sorted_prods[0]
+                most_efficient_prod, most_eff_meta = sorted_prods[-1]
+                
+                rec_col1, rec_col2 = st.columns(2)
+                
+                with rec_col1:
+                    st.subheader("Capital Reallocation Strategy")
+                    if least_eff_meta['iroas'] < most_eff_meta['iroas'] and least_eff_meta['spend'] > 0:
+                        st.success(f"🔄 **Shift Budget from {least_efficient_prod} to {most_efficient_prod}**")
+                        st.markdown(f"""
+                        * **Why:** `{least_efficient_prod}` is operating at a low iROAS of **{least_eff_meta['iroas']:.2f}x** due to high organic search overlap ({least_eff_meta['organic_sov']*100:.1f}% Organic SOV). Paid media here is actively cannibalizing free organic conversions.
+                        * **Action:** Trim ad exposure on `{least_efficient_prod}` and migrate that capital to `{most_efficient_prod}` which is delivering a highly incremental true return of **{most_eff_meta['iroas']:.2f}x**.
+                        """)
+                    else:
+                        st.info("ℹ️ **Maintain Balanced Funding:** Portfolio assets are running at closely aligned incremental efficiency margins. No aggressive category budget shifts are required at this time.")
+                
+                with rec_col2:
+                    st.subheader("Operational & Contextual Flags")
+                    context_recs = []
+                    
+                    # Scan for supply chain inventory warnings
+                    for p_name, p_meta in raw_metrics.items():
+                        if p_meta['inventory'] < 80.0:
+                            context_recs.append(f"🛑 **Cool down ad spend on `{p_name}`:** Store availability has dropped to **{p_meta['inventory']:.1f}%**. Scale back ad exposure immediately to prevent sending paid clicks to low-stock/out-of-stock variations.")
+                    
+                    # Scan for active promotions to exploit
+                    for p_name, p_meta in raw_metrics.items():
+                        if p_meta['promo'] and p_meta['iroas'] >= portfolio_iroas:
+                            context_recs.append(f"🔥 **Accelerate momentum on `{p_name}`:** There is an active promotion combined with an above-average iROAS (**{p_meta['iroas']:.2f}x**). Maintain high ad placement share to ride the current conversion velocity.")
+                    
+                    if context_recs:
+                        for rec in context_recs:
+                            st.markdown(rec)
+                    else:
+                        st.markdown("🟢 **All systems nominal:** No supply chain stock out vulnerabilities or high-priority promo gaps detected across the active product rows.")
+            else:
+                st.warning("⚠️ Recommendation Engine requires a minimum of 2 unique products in the dataset to calculate capital reallocation shifts.")
+
+            # Display raw supply warnings at the bottom if any exist
             for alert in low_inventory_alerts:
                 st.warning(alert)
                 
