@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import re
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="Kepler Multi-Layer Strategy Engine v18", 
+    page_title="Kepler Multi-Layer Strategy Engine v21", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -31,6 +32,28 @@ def identify_macro_category(name_string):
             return category
     return "Other Shark Systems"
 
+def clean_and_parse_numeric(series):
+    """
+    RUTHLESS PARSING ENGINE: Strips all hidden formatting, spaces, currencies,
+    and text characters out of a series to prevent pandas truncation or coercion errors.
+    """
+    # Force to string, strip whitespace, remove commas, dollar signs, and text artifacts
+    cleaned = series.astype(str).str.strip()
+    cleaned = cleaned.str.replace(r'[$\s,]', '', regex=True)
+    
+    # Handle percentages explicitly if present as text strings (e.g., "93%")
+    has_pct = cleaned.str.contains('%', regex=False)
+    cleaned = cleaned.str.replace('%', '', regex=False)
+    
+    # Convert to numeric float safely
+    numeric_flow = pd.to_numeric(cleaned, errors='coerce').fillna(0.0)
+    
+    # Scale down text percentages if needed
+    if has_pct.any():
+        numeric_flow = numeric_flow / 100.0
+        
+    return numeric_flow
+
 # --- SIDEBAR: ZERO-TOUCH INTELLIGENT DROP ZONE ---
 st.sidebar.header("1. Ingest Data Layers")
 uploaded_files = st.sidebar.file_uploader(
@@ -44,13 +67,18 @@ df_perf, df_prod, df_kw, df_brand = None, None, None, None
 if uploaded_files:
     for file in uploaded_files:
         try:
+            # Safely preview headers in lowercase to avoid case-sensitivity misses
             preview = pd.read_csv(file, nrows=2)
             preview.columns = preview.columns.str.lower().str.strip()
             file.seek(0)
             
-            if 'spend' in preview.columns or 'cost' in preview.columns:
+            # CRITICAL FIXED ROUTING: Performance file must contain BOTH Spend and Sales indicators
+            has_spend = any(c in preview.columns for c in ['spend', 'cost'])
+            has_sales = any(c in preview.columns for c in ['sales', 'revenue'])
+            
+            if has_spend and has_sales:
                 df_perf = pd.read_csv(file)
-                st.sidebar.success(f"📊 Performance: {file.name}")
+                st.sidebar.success(f"📊 Performance Locked: {file.name}")
             elif 'product' in preview.columns or 'asin' in preview.columns:
                 df_prod = pd.read_csv(file)
                 st.sidebar.success(f"📦 Product SOV: {file.name}")
@@ -65,8 +93,8 @@ if uploaded_files:
 
 st.sidebar.header("2. Model Adjusters & Guardrails")
 with st.sidebar.expander("⚙️ Strategic Constraints", expanded=True):
-    inflection_point = st.sidebar.slider("S-Curve Inflection Point (x₀)", 0.20, 0.60, 0.35, 0.05)
-    steepness = st.sidebar.slider("Decay Steepness (k)", 5.0, 15.0, 8.50, 0.5)
+    inflection_point = st.sidebar.slider("S-Curve Inflection Point (x₀)", 0.20, 0.60, 0.40, 0.05)
+    steepness = st.sidebar.slider("Decay Steepness (k)", 5.0, 15.0, 7.50, 0.5)
     max_allowed_iroas = st.sidebar.slider("Executive Sanity Ceiling", 3.0, 10.0, 5.50, 0.5)
 
 # --- MAIN ENGINE PROCESSING MATRIX ---
@@ -82,12 +110,12 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
 
         df_perf['assigned_category'] = df_perf[line_item_col].apply(identify_macro_category)
         
-        # Pure numeric parsing without destructive string methods
-        df_perf['clean_spend'] = pd.to_numeric(df_perf[spend_col], errors='coerce').fillna(0.0)
-        df_perf['clean_sales'] = pd.to_numeric(df_perf[sales_col], errors='coerce').fillna(0.0)
-        df_perf['clean_ntb'] = pd.to_numeric(df_perf[ntb_col], errors='coerce').fillna(0.0)
+        # Safe execution of parsing across columns
+        df_perf['clean_spend'] = clean_and_parse_numeric(df_perf[spend_col])
+        df_perf['clean_sales'] = clean_and_parse_numeric(df_perf[sales_col])
+        df_perf['clean_ntb'] = clean_and_parse_numeric(df_perf[ntb_col])
         
-        # Dynamic scaler: handles both formats (0.93 or 93.0) seamlessly
+        # Smart adaptation for NTB fractions entered as whole integers (e.g., 93.0 vs 0.93)
         if df_perf['clean_ntb'].max() > 1.0: 
             df_perf['clean_ntb'] /= 100.0
 
@@ -97,7 +125,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
         if df_brand is not None:
             df_brand.columns = df_brand.columns.str.lower().str.strip()
             b_org_col = [c for c in df_brand.columns if 'organic' in c or 'sov' in c or 'share' in c][0]
-            df_brand['clean_sov'] = pd.to_numeric(df_brand[b_org_col], errors='coerce').fillna(0.0)
+            df_brand['clean_sov'] = clean_and_parse_numeric(df_brand[b_org_col])
             if df_brand['clean_sov'].max() > 1.0: df_brand['clean_sov'] /= 100.0
             brand_baseline = df_brand['clean_sov'].mean()
 
@@ -106,7 +134,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
             kw_label_col = [c for c in df_kw.columns if 'keyword' in c or 'term' in c][0]
             kw_org_col = [c for c in df_kw.columns if 'organic' in c or 'sov' in c or 'share' in c][0]
             df_kw['assigned_category'] = df_kw[kw_label_col].apply(identify_macro_category)
-            df_kw['clean_sov'] = pd.to_numeric(df_kw[kw_org_col], errors='coerce').fillna(0.0)
+            df_kw['clean_sov'] = clean_and_parse_numeric(df_kw[kw_org_col])
             if df_kw['clean_sov'].max() > 1.0: df_kw['clean_sov'] /= 100.0
             kw_sov_dict = df_kw.groupby('assigned_category')['clean_sov'].mean().to_dict()
 
@@ -115,7 +143,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
             p_label_col = [c for c in df_prod.columns if 'product' in c or 'title' in c or 'asin' in c][0]
             p_org_col = [c for c in df_prod.columns if 'organic' in c or 'sov' in c or 'share' in c][0]
             df_prod['assigned_category'] = df_prod[p_label_col].apply(identify_macro_category)
-            df_prod['clean_sov'] = pd.to_numeric(df_prod[p_org_col], errors='coerce').fillna(0.0)
+            df_prod['clean_sov'] = clean_and_parse_numeric(df_prod[p_org_col])
             if df_prod['clean_sov'].max() > 1.0: df_prod['clean_sov'] /= 100.0
             prod_sov_dict = df_prod.groupby('assigned_category')['clean_sov'].mean().to_dict()
 
@@ -245,7 +273,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
         $$f(SOV_{org}) = \frac{1}{1 + e^{k \cdot (SOV_{org} - x_0)}}$$
         
         *Where:*
-        * $x_0$ represent the **Inflection Point** (set via sidebar; defaults to $0.35$). This is the threshold where cannibalization begins accelerating.
+        * $x_0$ represent the **Inflection Point** (set via sidebar). This is the threshold where cannibalization begins accelerating.
         * $k$ represents the **Decay Steepness** (set via sidebar). This controls how aggressively ad credit drops off as organic dominance nears $100\%$.
         
         This base factor is bounded between a baseline floor of $0.15$ and a ceiling of $0.90$ to account for standard baseline market velocity.
