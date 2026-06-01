@@ -78,7 +78,11 @@ if uploaded_files:
             
             if has_spend and has_sales:
                 df_perf = pd.read_csv(file)
-                st.sidebar.success(f"📊 Performance Locked: {file.name}")
+                # Safely capture and isolate the daily date layer if it exists
+                date_cols = [c for c in df_perf.columns.str.lower().str.strip() if 'date' in c]
+                if date_cols:
+                    df_perf.rename(columns={df_perf.columns[df_perf.columns.str.lower().str.strip() == date_cols[0]][0]: 'date'}, inplace=True)
+                st.sidebar.success(f"📊 Performance Locked (Daily Logs): {file.name}")
             elif 'product' in preview.columns or 'asin' in preview.columns:
                 df_prod = pd.read_csv(file)
                 st.sidebar.success(f"📦 Product SOV: {file.name}")
@@ -107,6 +111,9 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
         spend_col = [c for c in df_perf.columns if 'spend' in c or 'cost' in c][0]
         sales_col = [c for c in df_perf.columns if 'sales' in c or 'revenue' in c][0]
         ntb_col = [c for c in df_perf.columns if 'ntb' in c or 'new' in c][0]
+        
+        # Capture date column if present for row tracking
+        has_date_layer = 'date' in df_perf.columns
 
         df_perf['assigned_category'] = df_perf[line_item_col].apply(identify_macro_category)
         
@@ -150,10 +157,11 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
         # --- LAYER 3: CORE COMPILATION ENGINE ---
         st.header("Executive Category Matrix (Cascaded SOV Integration)")
         
+        # Daily logs roll up dynamically here by summing financial volumes across all dates
         category_summary = df_perf.groupby('assigned_category').agg({
             'clean_spend': 'sum',
             'clean_sales': 'sum',
-            'clean_ntb': 'mean'
+            'clean_ntb': 'mean'  # Aggregates daily rates safely across the month timeline
         }).reset_index()
 
         table_data = []
