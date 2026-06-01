@@ -4,7 +4,7 @@ import numpy as np
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="Kepler Multi-Layer Strategy Engine v15", 
+    page_title="Kepler Multi-Layer Strategy Engine v16", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -38,16 +38,19 @@ def identify_macro_category(name_string):
             return category
     return "Other Shark Systems"
 
-def clean_numeric_column(series):
-    """CRITICAL FIX: Explicitly strips currency symbols and commas to prevent truncation errors."""
-    if series.dtype == object:
-        cleaned = (series.astype(str)
-                   .str.strip()
-                   .str.replace('$', '', regex=False)
-                   .str.replace(',', '', regex=False) # Removes thousands separator comma
-                   .str.replace('%', '', regex=False))
-        return pd.to_numeric(cleaned, errors='coerce')
-    return pd.to_numeric(series, errors='coerce')
+def force_numeric_cleaning(series):
+    """
+    RUTHLESS CLEANING GUARDRAIL: Strong-arms any string column with currency, 
+    commas, or percentage signs into pure, calculable floating numbers immediately.
+    """
+    cleaned_series = series.astype(str).str.strip()
+    cleaned_series = cleaned_series.str.replace('$', '', regex=False)
+    cleaned_series = cleaned_series.str.replace(',', '', regex=False)
+    cleaned_series = cleaned_series.str.replace('%', '', regex=False)
+    
+    # Convert to float, replacing any unparseable text with NaN, then filling with 0
+    numeric_series = pd.to_numeric(cleaned_series, errors='coerce').fillna(0.0)
+    return numeric_series
 
 # --- SIDEBAR: ZERO-TOUCH INTELLIGENT DROP ZONE ---
 st.sidebar.header("1. Ingest Data Layers")
@@ -104,9 +107,13 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
         ntb_col = [c for c in df_perf.columns if 'ntb' in c or 'new' in c][0]
 
         df_perf['assigned_category'] = df_perf[line_item_col].apply(identify_macro_category)
-        df_perf['clean_spend'] = clean_numeric_column(df_perf[spend_col]).fillna(0)
-        df_perf['clean_sales'] = clean_numeric_column(df_perf[sales_col]).fillna(0)
-        df_perf['clean_ntb'] = clean_numeric_column(df_perf[ntb_col]).fillna(0)
+        
+        # RUN IMMEDIATE CLEANING
+        df_perf['clean_spend'] = force_numeric_cleaning(df_perf[spend_col])
+        df_perf['clean_sales'] = force_numeric_cleaning(df_perf[sales_col])
+        df_perf['clean_ntb'] = force_numeric_cleaning(df_perf[ntb_col])
+        
+        # Auto-adjust if NTB is formatted as whole percentage numbers (e.g., 93.0 instead of 0.93)
         if df_perf['clean_ntb'].max() > 1.0: 
             df_perf['clean_ntb'] /= 100.0
 
@@ -116,7 +123,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
         if df_brand is not None:
             df_brand.columns = df_brand.columns.str.lower().str.strip()
             b_org_col = [c for c in df_brand.columns if 'organic' in c or 'sov' in c or 'share' in c][0]
-            df_brand['clean_sov'] = clean_numeric_column(df_brand[b_org_col]).fillna(0)
+            df_brand['clean_sov'] = force_numeric_cleaning(df_brand[b_org_col])
             if df_brand['clean_sov'].max() > 1.0: df_brand['clean_sov'] /= 100.0
             brand_baseline = df_brand['clean_sov'].mean()
 
@@ -125,7 +132,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
             kw_label_col = [c for c in df_kw.columns if 'keyword' in c or 'term' in c][0]
             kw_org_col = [c for c in df_kw.columns if 'organic' in c or 'sov' in c or 'share' in c][0]
             df_kw['assigned_category'] = df_kw[kw_label_col].apply(identify_macro_category)
-            df_kw['clean_sov'] = clean_numeric_column(df_kw[kw_org_col]).fillna(0)
+            df_kw['clean_sov'] = force_numeric_cleaning(df_kw[kw_org_col])
             if df_kw['clean_sov'].max() > 1.0: df_kw['clean_sov'] /= 100.0
             kw_sov_dict = df_kw.groupby('assigned_category')['clean_sov'].mean().to_dict()
 
@@ -134,7 +141,7 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
             p_label_col = [c for c in df_prod.columns if 'product' in c or 'title' in c or 'asin' in c][0]
             p_org_col = [c for c in df_prod.columns if 'organic' in c or 'sov' in c or 'share' in c][0]
             df_prod['assigned_category'] = df_prod[p_label_col].apply(identify_macro_category)
-            df_prod['clean_sov'] = clean_numeric_column(df_prod[p_org_col]).fillna(0)
+            df_prod['clean_sov'] = force_numeric_cleaning(df_prod[p_org_col])
             if df_prod['clean_sov'].max() > 1.0: df_prod['clean_sov'] /= 100.0
             prod_sov_dict = df_prod.groupby('assigned_category')['clean_sov'].mean().to_dict()
 
@@ -234,7 +241,6 @@ if df_perf is not None and (df_prod is not None or df_kw is not None or df_brand
                 with st.expander(f"📋 Strategic Plan: {cat}", expanded=True):
                     st.write(f"**Current iROAS:** {metrics['iroas']:.2f}x | **Organic SOV:** {metrics['organic_sov']*100:.1f}%")
                     
-                    # Custom programmatic logic for every category
                     if metrics['organic_sov'] > inflection_point:
                         st.error("⚠️ **Status: Cannibalization Risk (High Organic Overlap)**")
                         st.markdown(f"""
