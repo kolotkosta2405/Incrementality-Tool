@@ -2,30 +2,25 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-st.set_page_config(page_title="Retail Media Incrementality Engine v8", layout="wide")
+st.set_page_config(page_title="Retail Media Incrementality Engine v9", layout="wide")
 
 st.title("📊 Retail Media Incrementality Engine")
 st.subheader("Advanced Bayesian Causal Inference Dashboard (Unified Model)")
 
 st.markdown("""
-This engine isolates true media lift from organic cannibalization by replacing rigid rules with a non-linear **Logistic S-Curve** and a **Category-Aware New-to-Brand (NTB)** balancing matrix.
+This engine isolates true media lift from organic cannibalization by replacing rigid rules with a non-linear **Logistic S-Curve** and an **Automated, Row-Level Category-Aware New-to-Brand (NTB)** balancing matrix.
 """)
 
 # --- SIDEBAR CONTROLS ---
 st.sidebar.header("1. Upload Master Data Layer")
 uploaded_file = st.sidebar.file_uploader("Upload Unified Performance CSV", type=["csv"])
 
-st.sidebar.header("2. Global Engine Calibration")
-category_type = st.sidebar.selectbox(
-    "Select Primary Product Category Layout",
-    ["Consumables / CPG (High Repeat Purchases)", "Durables / Electronics (Low Repeat Purchases)"]
-)
-
+st.sidebar.header("2. Global Curve Calibration")
 # Advanced S-Curve tuning parameter toggles hidden cleanly in sidebar expander
-with st.sidebar.expander("⚙️ Advanced S-Curve Coefficients"):
+with st.sidebar.expander("⚙️ Advanced S-Curve Coefficients", expanded=True):
     inflection_point = st.slider("Curve Inflection Point (x₀)", 0.20, 0.60, 0.40, 0.05, 
                                   help="The Organic SOV point where incrementality degradation accelerates fastest.")
-    steepness = st.slider("Curve Decay Steepness (k)", 5.0, 15.0, 10.0, 0.5,
+    steepness = st.slider("Curve Decay Steepness (k)", 5.0, 15.0, 8.50, 0.5,
                           help="Higher numbers enforce harsher cannibalization penalties when crossing the inflection threshold.")
 
 def clean_numeric_column(series):
@@ -91,14 +86,14 @@ if uploaded_file:
                 if df['inv_clean'].max() <= 1.0 and df['inv_clean'].sum() > 0:
                     df['inv_clean'] = df['inv_clean'] * 100.0
 
-            st.success("🟢 Advanced Multi-Variable Validation Passed: Raw rows successfully ingested into causal engine.")
+            st.success("🟢 Advanced Multi-Variable Validation Passed: Raw rows successfully ingested. Row-level dynamic categorization active.")
 
             # --- CALCULATIONS MATRIX ENGINE ---
             st.header("Product Performance & Incrementality Matrix")
             
             unique_products = df['product id'].dropna().unique()
             table_data = []
-            raw_metrics = {} # Stores numeric metrics for building strategic recommendations later
+            raw_metrics = {} 
             
             total_portfolio_spend = 0
             total_portfolio_incremental_sales = 0
@@ -116,15 +111,23 @@ if uploaded_file:
                 s_curve_factor = 1.0 / (1.0 + np.exp(steepness * (avg_organic_sov - inflection_point)))
                 incrementality_factor = max(0.10, min(0.95, s_curve_factor))
                 
-                # Formula Layer 2: Category-Aware NTB Elasticity Adjuster
+                # Formula Layer 2: AUTOMATED ROW-LEVEL CATEGORY DETECTION (Fixes Mixed-Portfolio Leak)
                 avg_ntb = 0.0
-                if has_ntb:
-                    avg_ntb = float(prod_data['ntb_clean'].mean())
-                    if "Consumables" in category_type:
-                        incrementality_factor += (avg_ntb * 0.20)
-                    else:
+                if "elec" in str(prod).lower():
+                    product_category_assignment = "Electronics"
+                    if has_ntb:
+                        avg_ntb = float(prod_data['ntb_clean'].mean())
+                        # Electronics: Naturally high NTB baselines are normal. Dampen to +5% max benefit.
                         incrementality_factor += (avg_ntb * 0.05)
-                    incrementality_factor = min(0.98, max(0.05, incrementality_factor))
+                else:
+                    product_category_assignment = "CPG"
+                    if has_ntb:
+                        avg_ntb = float(prod_data['ntb_clean'].mean())
+                        # CPG: High NTB implies highly efficient brand conquesting. Reward up to +20% lift.
+                        incrementality_factor += (avg_ntb * 0.20)
+                
+                # Re-verify legal mathematical boundaries after category tuning adjustments
+                incrementality_factor = min(0.98, max(0.05, incrementality_factor))
                 
                 # Formula Layer 3: Contextual Supply Chain & Markdown Conditions
                 avg_inventory = 100.0
@@ -149,8 +152,9 @@ if uploaded_file:
                 total_portfolio_spend += total_spend
                 total_portfolio_incremental_sales += incremental_sales
                 
-                # Save data for recommendations parsing
+                # Save processed metadata grouped clearly by category to power realistic allocations
                 raw_metrics[prod] = {
+                    'category': product_category_assignment,
                     'iroas': iroas,
                     'spend': total_spend,
                     'organic_sov': avg_organic_sov,
@@ -160,6 +164,7 @@ if uploaded_file:
                 
                 table_data.append({
                     "Product ID": prod,
+                    "Detected Category": product_category_assignment,
                     "Avg Organic SOV": f"{avg_organic_sov*100:.1f}%",
                     "New-to-Brand (NTB) %": f"{avg_ntb*100:.1f}%" if has_ntb else "N/A",
                     "Store Availability": f"{avg_inventory:.1f}%",
@@ -181,51 +186,72 @@ if uploaded_file:
             col2.metric("True Incremental Volume", f"${total_portfolio_incremental_sales:,.2f}")
             col3.metric("Blended Portfolio iROAS", f"{portfolio_iroas:.2f}x")
             
-            st.info(f"💬 **The Confidence Statement:** Based on non-linear S-curve processing adjusted for your customized **{category_type}** parameters, this profile isolated **${total_portfolio_incremental_sales:,.2f}** in direct net-new consumer demand.")
+            st.info(f"💬 **The Confidence Statement:** Based on non-linear S-curve processing with isolated row-level category matrices, this portfolio isolated **${total_portfolio_incremental_sales:,.2f}** in direct net-new consumer demand.")
             
-            # --- NEW STRATEGIC MEDIA DIRECTIVES (RECOMMENDATIONS MODULE) ---
+            # --- STRATEGIC MEDIA DIRECTIVES (CATEGORIZED RECOMMENDATIONS MODULE) ---
             st.header("🎯 Strategic Media Directives")
             
-            if len(raw_metrics) >= 2:
-                # Find best and worst products based on true incremental returns (iROAS)
-                sorted_prods = sorted(raw_metrics.items(), key=lambda item: item[1]['iroas'])
-                least_efficient_prod, least_eff_meta = sorted_prods[0]
-                most_efficient_prod, most_eff_meta = sorted_prods[-1]
+            rec_col1, rec_col2 = st.columns(2)
+            
+            with rec_col1:
+                st.subheader("Intra-Category Capital Reallocation")
                 
-                rec_col1, rec_col2 = st.columns(2)
+                # Split metrics into independent buckets so we don't recommend transferring funds between CPG and Electronics
+                cpg_prods = {k: v for k, v in raw_metrics.items() if v['category'] == 'CPG' and v['spend'] > 0}
+                elec_prods = {k: v for k, v in raw_metrics.items() if v['category'] == 'Electronics' and v['spend'] > 0}
                 
-                with rec_col1:
-                    st.subheader("Capital Reallocation Strategy")
-                    if least_eff_meta['iroas'] < most_eff_meta['iroas'] and least_eff_meta['spend'] > 0:
-                        st.success(f"🔄 **Shift Budget from {least_efficient_prod} to {most_efficient_prod}**")
+                has_renderable_recommendation = False
+                
+                # Render CPG shift advice if multiple CPG items exist
+                if len(cpg_prods) >= 2:
+                    sorted_cpg = sorted(cpg_prods.items(), key=lambda item: item[1]['iroas'])
+                    worst_cpg, worst_cpg_meta = sorted_cpg[0]
+                    best_cpg, best_cpg_meta = sorted_cpg[-1]
+                    
+                    if worst_cpg_meta['iroas'] < best_cpg_meta['iroas']:
+                        has_renderable_recommendation = True
+                        st.success(f"🔄 **CPG Optimization:** Shift Budget from `{worst_cpg}` to `{best_cpg}`")
                         st.markdown(f"""
-                        * **Why:** `{least_efficient_prod}` is operating at a low iROAS of **{least_eff_meta['iroas']:.2f}x** due to high organic search overlap ({least_eff_meta['organic_sov']*100:.1f}% Organic SOV). Paid media here is actively cannibalizing free organic conversions.
-                        * **Action:** Trim ad exposure on `{least_efficient_prod}` and migrate that capital to `{most_efficient_prod}` which is delivering a highly incremental true return of **{most_eff_meta['iroas']:.2f}x**.
+                        * **Why:** `{worst_cpg}` has low incremental efficiency (**{worst_cpg_meta['iroas']:.2f}x**) due to significant natural shelf overlap ({worst_cpg_meta['organic_sov']*100:.1f}% Organic SOV). Media here is cannibalizing organic baseline sales.
+                        * **Action:** Trim spend on `{worst_cpg}` and migrate that capital to `{best_cpg}` which yields a highly incremental true return of **{best_cpg_meta['iroas']:.2f}x**.
                         """)
-                    else:
-                        st.info("ℹ️ **Maintain Balanced Funding:** Portfolio assets are running at closely aligned incremental efficiency margins. No aggressive category budget shifts are required at this time.")
                 
-                with rec_col2:
-                    st.subheader("Operational & Contextual Flags")
-                    context_recs = []
+                # Render Electronics shift advice if multiple Electronics items exist
+                if len(elec_prods) >= 2:
+                    sorted_elec = sorted(elec_prods.items(), key=lambda item: item[1]['iroas'])
+                    worst_elec, worst_elec_meta = sorted_elec[0]
+                    best_elec, best_elec_meta = sorted_elec[-1]
                     
-                    # Scan for supply chain inventory warnings
-                    for p_name, p_meta in raw_metrics.items():
-                        if p_meta['inventory'] < 80.0:
-                            context_recs.append(f"🛑 **Cool down ad spend on `{p_name}`:** Store availability has dropped to **{p_meta['inventory']:.1f}%**. Scale back ad exposure immediately to prevent sending paid clicks to low-stock/out-of-stock variations.")
-                    
-                    # Scan for active promotions to exploit
-                    for p_name, p_meta in raw_metrics.items():
-                        if p_meta['promo'] and p_meta['iroas'] >= portfolio_iroas:
-                            context_recs.append(f"🔥 **Accelerate momentum on `{p_name}`:** There is an active promotion combined with an above-average iROAS (**{p_meta['iroas']:.2f}x**). Maintain high ad placement share to ride the current conversion velocity.")
-                    
-                    if context_recs:
-                        for rec in context_recs:
-                            st.markdown(rec)
-                    else:
-                        st.markdown("🟢 **All systems nominal:** No supply chain stock out vulnerabilities or high-priority promo gaps detected across the active product rows.")
-            else:
-                st.warning("⚠️ Recommendation Engine requires a minimum of 2 unique products in the dataset to calculate capital reallocation shifts.")
+                    if worst_elec_meta['iroas'] < best_elec_meta['iroas']:
+                        has_renderable_recommendation = True
+                        st.success(f"🔄 **Electronics Optimization:** Shift Budget from `{worst_elec}` to `{best_elec}`")
+                        st.markdown(f"""
+                        * **Why:** `{worst_elec}` is delivering a soft true return of **{worst_elec_meta['iroas']:.2f}x** relative to your available durable portfolio. 
+                        * **Action:** Shift media exposure over to `{best_elec}` which is capturing cleaner market demand with an incremental return of **{best_elec_meta['iroas']:.2f}x**.
+                        """)
+                        
+                if not has_renderable_recommendation:
+                    st.info("ℹ️ **Maintain Balanced Funding:** All active portfolio segments are running at closely aligned dynamic efficiency margins. No category reallocations required.")
+            
+            with rec_col2:
+                st.subheader("Operational & Contextual Flags")
+                context_recs = []
+                
+                # Scan for supply chain inventory warnings
+                for p_name, p_meta in raw_metrics.items():
+                    if p_meta['inventory'] < 80.0:
+                        context_recs.append(f"🛑 **Cool down ad spend on `{p_name}`:** Store availability has dropped to **{p_meta['inventory']:.1f}%**. Scale back ad exposure immediately to prevent sending paid clicks to low-stock/out-of-stock variations.")
+                
+                # Scan for active promotions to exploit
+                for p_name, p_meta in raw_metrics.items():
+                    if p_meta['promo'] and p_meta['iroas'] >= portfolio_iroas:
+                        context_recs.append(f"🔥 **Accelerate momentum on `{p_name}`:** There is an active promotion combined with an above-average iROAS (**{p_meta['iroas']:.2f}x**). Maintain high ad placement share to ride the current conversion velocity.")
+                
+                if context_recs:
+                    for rec in context_recs:
+                        st.markdown(rec)
+                else:
+                    st.markdown("🟢 **All systems nominal:** No supply chain stock out vulnerabilities or high-priority promo gaps detected across the active product rows.")
 
             # Display raw supply warnings at the bottom if any exist
             for alert in low_inventory_alerts:
@@ -239,10 +265,9 @@ if uploaded_file:
                 $$\\text{{Base Factor}} = \\frac{{1}}{{1 + e^{{k \\times (\\text{{Organic SOV}} - x_0)}}}}$$
                 * **Current Active Calibration:** Inflection point ($x_0$) set to **{inflection_point*100:.0f}% SOV** with a decay steepness rate ($k$) of **{steepness}**. This mathematical model models behavior non-linearly: high incrementality is sustained until critical competitive visibility overlaps occur, where credit decays aggressively.
                 
-                ### 2. Category-Aware NTB Mechanics:
-                * Selected Profile: **{category_type}**
-                * *CPG Mode Logic:* High baseline re-purchase frequencies mean standard buyers buy naturally. A high NTB percentage directly indicates cross-brand conquesting, awarding a linear multiplier bonus up to $+20\\%$ back to the incrementality pool.
-                * *Electronics Mode Logic:* Infrequent buy cycles mean organic return users are rare; high NTB is structurally normal. The engine heavily dampens it, allowing a maximum positive scalar variance of only $+5\\%$ to protect against over-attribution.
+                ### 2. Automated Row-Level NTB Mechanics:
+                * *CPG Mode Logic (Triggered automatically for rows without 'elec' in ID):* High baseline re-purchase frequencies mean standard buyers buy naturally. A high NTB percentage directly indicates cross-brand conquesting, awarding a linear multiplier bonus up to $+20\\%$ back to the incrementality pool.
+                * *Electronics Mode Logic (Triggered automatically via 'elec' string detection):* Infrequent buy cycles mean organic return users are rare; high NTB is structurally normal. The engine heavily dampens it, allowing a maximum positive scalar variance of only $+5\\%$ to protect against over-attribution.
                 """)
                 
         except Exception as e:
