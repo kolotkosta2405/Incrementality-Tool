@@ -24,7 +24,7 @@ category_type = st.sidebar.selectbox(
 # Advanced S-Curve tuning parameter toggles hidden cleanly in sidebar expander
 with st.sidebar.expander("⚙️ Advanced S-Curve Coefficients"):
     inflection_point = st.slider("Curve Inflection Point (x₀)", 0.20, 0.60, 0.40, 0.05, 
-                                  help="The Organic SOV point where incrementality degradation accelerates fastest.")
+                                 help="The Organic SOV point where incrementality degradation accelerates fastest.")
     steepness = st.slider("Curve Decay Steepness (k)", 5.0, 15.0, 10.0, 0.5,
                           help="Higher numbers enforce harsher cannibalization penalties when crossing the inflection threshold.")
 
@@ -136,7 +136,7 @@ if uploaded_file:
                 
                 is_promo_active = False
                 if has_promo:
-                    promo_col = 'promo_status' if 'promo_status' in df.columns else 'promo_flag'
+                    promo_col = 'promo_status' if 'promo_flag' not in df.columns else 'promo_flag'
                     is_promo_active = prod_data[promo_col].astype(str).str.lower().str.contains('active|yes|1').any()
                     if is_promo_active:
                         incrementality_factor = min(0.98, incrementality_factor * 1.05)
@@ -155,7 +155,9 @@ if uploaded_file:
                     'spend': total_spend,
                     'organic_sov': avg_organic_sov,
                     'inventory': avg_inventory,
-                    'promo': is_promo_active
+                    'promo': is_promo_active,
+                    'factor': incrementality_factor,
+                    'prob_lift': prob_lift
                 }
                 
                 table_data.append({
@@ -183,54 +185,92 @@ if uploaded_file:
             
             st.info(f"💬 **The Confidence Statement:** Based on non-linear S-curve processing adjusted for your customized **{category_type}** parameters, this profile isolated **${total_portfolio_incremental_sales:,.2f}** in direct net-new consumer demand.")
             
-            # --- NEW STRATEGIC MEDIA DIRECTIVES (RECOMMENDATIONS MODULE) ---
+            # --- EXPANDED STRATEGIC MEDIA DIRECTIVES (RECOMMENDATIONS MODULE) ---
             st.header("🎯 Strategic Media Directives")
             
-            if len(raw_metrics) >= 2:
-                # Find best and worst products based on true incremental returns (iROAS)
-                sorted_prods = sorted(raw_metrics.items(), key=lambda item: item[1]['iroas'])
-                least_efficient_prod, least_eff_meta = sorted_prods[0]
-                most_efficient_prod, most_eff_meta = sorted_prods[-1]
+            # Arrays to structure reallocation matching
+            funding_sources = []
+            growth_targets = []
+            
+            st.subheader("📋 Category-by-Category Investment Verdicts")
+            
+            for prod, meta in raw_metrics.items():
+                # Core logical switches evaluating investment viability
+                high_cannibalization = meta['organic_sov'] >= inflection_point
+                strong_return = meta['iroas'] >= portfolio_iroas if portfolio_iroas > 0 else meta['iroas'] > 1.5
                 
-                rec_col1, rec_col2 = st.columns(2)
-                
-                with rec_col1:
-                    st.subheader("Capital Reallocation Strategy")
-                    if least_eff_meta['iroas'] < most_eff_meta['iroas'] and least_eff_meta['spend'] > 0:
-                        st.success(f"🔄 **Shift Budget from {least_efficient_prod} to {most_efficient_prod}**")
-                        st.markdown(f"""
-                        * **Why:** `{least_efficient_prod}` is operating at a low iROAS of **{least_eff_meta['iroas']:.2f}x** due to high organic search overlap ({least_eff_meta['organic_sov']*100:.1f}% Organic SOV). Paid media here is actively cannibalizing free organic conversions.
-                        * **Action:** Trim ad exposure on `{least_efficient_prod}` and migrate that capital to `{most_efficient_prod}` which is delivering a highly incremental true return of **{most_eff_meta['iroas']:.2f}x**.
-                        """)
+                # Setup user interface presentation containers
+                with st.expander(f"Analysis Profile: {prod}", expanded=True):
+                    card_col1, card_col2, card_col3 = st.columns([1, 1, 2])
+                    
+                    card_col1.metric("Incremental ROAS", f"{meta['iroas']:.2f}x")
+                    card_col2.metric("Ad Incrementality %", f"{meta['factor']*100:.0f}%")
+                    
+                    if high_cannibalization:
+                        funding_sources.append((prod, meta['iroas']))
+                        verdict_title = "❌ **Investment Verdict: Reduce Exposure / Funding Source**"
+                        verdict_desc = f"""
+                        * **The Context:** Paid media is highly redundant here. Your brand enjoys an organic presence of **{meta['organic_sov']*100:.1f}% SOV**. Paid ads are actively overlapping with your free listings.
+                        * **Action:** Trim budgets by **15% to 25%**. Pull back from generic search terms and focus ad spend exclusively on protective brand keywords or conquesting spaces to prevent paying for clicks you would have earned for free.
+                        """
+                    elif strong_return:
+                        growth_targets.append((prod, meta['iroas']))
+                        verdict_title = "🟢 **Investment Verdict: Scale Budget / Growth Target**"
+                        verdict_desc = f"""
+                        * **The Context:** This category is highly incremental. Organic shelf presence is low, and your true ad return (**{meta['iroas']:.2f}x iROAS**) sits safely above the portfolio baseline (**{portfolio_iroas:.2f}x**).
+                        * **Action:** Funnel extra budget here immediately. Every dollar added is creating un-cannibalized net-new growth with a **{meta['prob_lift']:.1f}% probability of true sales lift**.
+                        """
                     else:
-                        st.info("ℹ️ **Maintain Balanced Funding:** Portfolio assets are running at closely aligned incremental efficiency margins. No aggressive category budget shifts are required at this time.")
+                        verdict_title = "🔵 **Investment Verdict: Hold Baseline / Maintain & Monitor**"
+                        verdict_desc = f"""
+                        * **The Context:** This category operates at localized efficiency with an incremental return of **{meta['iroas']:.2f}x**. It is currently un-cannibalized but bounded by mid-funnel keyword volume limitations.
+                        * **Action:** Maintain existing spend settings. Focus on running structural copy adjustments or testing non-to-brand optimizations rather than modifying budget totals.
+                        """
+                        
+                    card_col3.markdown(f"**{verdict_title}**\n{verdict_desc}")
+
+            # Smart Cross-Category Budget Shifting Layer
+            st.subheader("🔄 Portfolio Capital Optimization Blueprint")
+            
+            if len(raw_metrics) >= 2:
+                if funding_sources and growth_targets:
+                    st.success("💡 **Capital Migration Strategy Plan:** To scale net-new portfolio demand without increasing your total ad spend, execute these specific resource transfers:")
+                    
+                    # Order lists to pair least efficient with most efficient targets
+                    sorted_sources = sorted(funding_sources, key=lambda x: x[1])
+                    sorted_targets = sorted(growth_targets, key=lambda x: x[1], reverse=True)
+                    
+                    for source_name, source_iroas in sorted_sources:
+                        if sorted_targets:
+                            target_name, target_iroas = sorted_targets[0]
+                            st.markdown(f"* **Divert Ad Dollars away from `{source_name}` and move them to `{target_name}`:**")
+                            st.markdown(f"  * *Why:* `{source_name}` is trapped in an organic cannibalization loop earning just **{source_iroas:.2f}x iROAS**. Moving those dollars into `{target_name}` immediately exposes that capital to an un-saturated market delivering a true return of **{target_iroas:.2f}x iROAS**.")
+                else:
+                    st.info("ℹ️ **Funding Equilibrium Reached:** All active product items across your profile are generating tightly balanced incrementality metrics. Cross-category budget shifting plays are not necessary at this time.")
+            else:
+                st.warning("⚠️ Optimization Blueprint requires a minimum of 2 unique categories inside the uploaded data file to build cross-budget migration scenarios.")
+
+            # Operational Flags (Inventory and Promo trackers)
+            if has_inventory or has_promo:
+                st.subheader("⚠️ Secondary Contextual & Operational Flags")
+                flag_col1, flag_col2 = st.columns(2)
                 
-                with rec_col2:
-                    st.subheader("Operational & Contextual Flags")
-                    context_recs = []
-                    
-                    # Scan for supply chain inventory warnings
-                    for p_name, p_meta in raw_metrics.items():
-                        if p_meta['inventory'] < 80.0:
-                            context_recs.append(f"🛑 **Cool down ad spend on `{p_name}`:** Store availability has dropped to **{p_meta['inventory']:.1f}%**. Scale back ad exposure immediately to prevent sending paid clicks to low-stock/out-of-stock variations.")
-                    
-                    # Scan for active promotions to exploit
+                with flag_col1:
+                    if low_inventory_alerts:
+                        for alert in low_inventory_alerts:
+                            st.error(alert)
+                    else:
+                        st.write("🟢 **Supply Chain Status:** Nominal. No categories show out-of-stock threats or stock-out performance adjustments.")
+                        
+                with flag_col2:
+                    promo_found = False
                     for p_name, p_meta in raw_metrics.items():
                         if p_meta['promo'] and p_meta['iroas'] >= portfolio_iroas:
-                            context_recs.append(f"🔥 **Accelerate momentum on `{p_name}`:** There is an active promotion combined with an above-average iROAS (**{p_meta['iroas']:.2f}x**). Maintain high ad placement share to ride the current conversion velocity.")
-                    
-                    if context_recs:
-                        for rec in context_recs:
-                            st.markdown(rec)
-                    else:
-                        st.markdown("🟢 **All systems nominal:** No supply chain stock out vulnerabilities or high-priority promo gaps detected across the active product rows.")
-            else:
-                st.warning("⚠️ Recommendation Engine requires a minimum of 2 unique products in the dataset to calculate capital reallocation shifts.")
+                            st.warning(f"🔥 **Exploit Deal Momentum on `{p_name}`:** An active marketing promo is currently running on a category delivering strong incremental value (**{p_meta['iroas']:.2f}x iROAS**). Keep ad bidding high to maximize conversion momentum.")
+                            promo_found = True
+                    if not promo_found:
+                        st.write("ℹ️ **Promo Status:** No active price promotions are currently paired with un-tapped market lift capacity.")
 
-            # Display raw supply warnings at the bottom if any exist
-            for alert in low_inventory_alerts:
-                st.warning(alert)
-                
             # --- FORMULA EXPLAINER GUIDES ---
             st.header("🧠 Behind the Curtains (How the Math Works)")
             with st.expander("Click to open the Marketing-Nerd Formula Guide"):
