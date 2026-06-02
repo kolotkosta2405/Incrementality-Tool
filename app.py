@@ -23,9 +23,9 @@ category_type = st.sidebar.selectbox(
 
 # Advanced S-Curve tuning parameter toggles hidden cleanly in sidebar expander
 with st.sidebar.expander("⚙️ Advanced S-Curve Coefficients"):
-    inflection_point = st.slider("Curve Inflection Point (x₀)", 0.20, 0.60, 0.40, 0.05, 
+    inflection_point = st.slider("Curve Inflection Point (x₀)", 0.05, 0.35, 0.20, 0.05, 
                                  help="The Organic SOV point where incrementality degradation accelerates fastest.")
-    steepness = st.slider("Curve Decay Steepness (k)", 5.0, 15.0, 10.0, 0.5,
+    steepness = st.slider("Curve Decay Steepness (k)", 1.0, 10.0, 5.5, 0.5,
                           help="Higher numbers enforce harsher cannibalization penalties when crossing the inflection threshold.")
 
 def clean_numeric_column(series):
