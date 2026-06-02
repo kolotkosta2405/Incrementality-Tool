@@ -23,9 +23,9 @@ category_type = st.sidebar.selectbox(
 
 # Advanced S-Curve tuning parameter toggles hidden cleanly in sidebar expander
 with st.sidebar.expander("⚙️ Advanced S-Curve Coefficients"):
-    inflection_point = st.slider("Curve Inflection Point (x₀)", 0.05, 0.35, 0.20, 0.05, 
+    inflection_point = st.slider("Curve Inflection Point (x₀)", 0.20, 0.60, 0.40, 0.05, 
                                  help="The Organic SOV point where incrementality degradation accelerates fastest.")
-    steepness = st.slider("Curve Decay Steepness (k)", 1.0, 10.0, 5.5, 0.5,
+    steepness = st.slider("Curve Decay Steepness (k)", 5.0, 15.0, 10.0, 0.5,
                           help="Higher numbers enforce harsher cannibalization penalties when crossing the inflection threshold.")
 
 def clean_numeric_column(series):
@@ -226,20 +226,33 @@ if uploaded_file:
                         
                     card_col3.markdown(f"**{verdict_title}**\n{verdict_desc}")
 
+            # --- UPDATED VALUE-DIVERSIFIED BLUEPRINT SECTION ---
             st.subheader("🔄 Portfolio Capital Optimization Blueprint")
             
             if len(raw_metrics) >= 2:
                 if funding_sources and growth_targets:
-                    st.success("💡 **Capital Migration Strategy Plan:** To scale net-new portfolio demand without increasing your total ad spend, execute these specific resource transfers:")
+                    st.success("💡 **Diversified Capital Migration Plan:** To scale net-new portfolio demand without increasing your total ad spend, harvest under-performing budget across lower-performing lines and spread your investments across a diversified group of high-incrementality targets:")
                     
+                    # 1. Clear summary of all accounts losing spend
+                    st.markdown("### 📉 1. Targeted Budget Reductions (Pull Back Capital):")
                     sorted_sources = sorted(funding_sources, key=lambda x: x[1])
+                    for source_name, source_iroas in sorted_sources:
+                        st.markdown(f"* **Divert funds away from `{source_name}`** (Current Return: **{source_iroas:.2f}x iROAS**). Scale down exposure here due to severe organic cannibalization loops.")
+                    
+                    # 2. Comprehensive, proportional multi-category investment guide
+                    st.markdown("### 📈 2. Proportional Portfolio Reallocation Plan (Invest Capital):")
+                    st.markdown("Deploy your harvested ad dollars across the following high-performing targets simultaneously. Capital distribution is **scaled proportionally**—the higher the category's true return profile, the larger its share of the reallocated investment pool:")
+                    
+                    total_target_iroas = sum(t[1] for t in growth_targets)
                     sorted_targets = sorted(growth_targets, key=lambda x: x[1], reverse=True)
                     
-                    for source_name, source_iroas in sorted_sources:
-                        if sorted_targets:
-                            target_name, target_iroas = sorted_targets[0]
-                            st.markdown(f"* **Divert Ad Dollars away from `{source_name}` and move them to `{target_name}`:**")
-                            st.markdown(f"  * *Why:* `{source_name}` is trapped in an organic cannibalization loop earning just **{source_iroas:.2f}x iROAS**. Moving those dollars into `{target_name}` immediately exposes that capital to an un-saturated market delivering a true return of **{target_iroas:.2f}x iROAS**.")
+                    for target_name, target_iroas in sorted_targets:
+                        # Derive exact mathematical priority weighting based on relative iROAS strengths
+                        alloc_weight = (target_iroas / total_target_iroas) * 100 if total_target_iroas > 0 else 0
+                        
+                        st.markdown(f"* **Deploy to `{target_name}`** (Current Return: **{target_iroas:.2f}x iROAS**)")
+                        st.markdown(f"  * *Reallocation Weight Priority:* **{alloc_weight:.1f}%** of all harvested capital.")
+                        st.markdown(f"  * *Strategic Focus:* This category maintains an exceptional headroom index. Funneling **{alloc_weight:.1f}%** of your available migration capital directly captures market share and expands clean incremental volume safely above your portfolio baseline.")
                 else:
                     st.info("ℹ️ **Funding Equilibrium Reached:** All active product items across your profile are generating tightly balanced incrementality metrics. Cross-category budget shifting plays are not necessary at this time.")
             else:
@@ -265,7 +278,7 @@ if uploaded_file:
                     if not promo_found:
                         st.write("ℹ️ **Promo Status:** No active price promotions are currently paired with un-tapped market lift capacity.")
 
-            # --- COMPLETELY OVERHAULED CAUSAL METRIC EXPLAINER LAYER ---
+            # --- FORMULA EXPLAINER GUIDES ---
             st.header("🧠 Behind the Curtains (How the Math Works)")
             with st.expander("Click to open the Whitepaper-Grade Formula & Methodology Guide", expanded=False):
                 st.markdown(f"""
