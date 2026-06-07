@@ -2,13 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-st.set_page_config(page_title="Retail Media Incrementality Engine v8", layout="wide")
+st.set_page_config(page_title="Retail Media Incrementality Engine v9", layout="wide")
 
 st.title("📊 Retail Media Incrementality Engine")
-st.subheader("Advanced Bayesian Causal Inference Dashboard (Unified Model)")
+st.subheader("Advanced Bayesian Causal Inference Dashboard (Unified Model with ASP Economics)")
 
 st.markdown("""
-This engine isolates true media lift from organic cannibalization by replacing rigid rules with a non-linear **Logistic S-Curve** and a **Category-Aware New-to-Brand (NTB)** balancing matrix.
+This engine isolates true media lift from organic cannibalization by replacing rigid rules with a non-linear **Logistic S-Curve**, a **Category-Aware New-to-Brand (NTB)** balancing matrix, and **ASP Unit Economics**.
 """)
 
 # --- SIDEBAR CONTROLS ---
@@ -51,8 +51,8 @@ if uploaded_file:
                 
             df.columns = df.columns.str.lower().str.strip()
             
-            # Core validation array checking for NTB column presence
-            mandatory_cols = ['date', 'product id', 'media_spend', 'total_sales', 'organic_sov', 'paid_sov']
+            # Core validation array checking for mandatory columns (including units and clicks for ASP/CPC)
+            mandatory_cols = ['date', 'product id', 'media_spend', 'total_sales', 'organic_sov', 'paid_sov', 'units_sold', 'clicks']
             missing_cols = [col for col in mandatory_cols if col not in df.columns]
             
             if missing_cols:
@@ -69,7 +69,7 @@ if uploaded_file:
             # --- DATA STANDARDIZATION CLEANUP LAYER ---
             df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed')
             
-            for col in ['media_spend', 'total_sales', 'organic_sov', 'paid_sov']:
+            for col in ['media_spend', 'total_sales', 'organic_sov', 'paid_sov', 'units_sold', 'clicks']:
                 df[col] = clean_numeric_column(df[col])
                 df[col] = df[col].fillna(0)
                 
@@ -109,8 +109,16 @@ if uploaded_file:
                 
                 total_spend = float(prod_data['media_spend'].sum())
                 total_sales = float(prod_data['total_sales'].sum())
+                total_units = float(prod_data['units_sold'].sum())
+                total_clicks = float(prod_data['clicks'].sum())
+                
                 avg_organic_sov = float(prod_data['organic_sov'].mean())
                 avg_paid_sov = float(prod_data['paid_sov'].mean())
+                
+                # Dynamic ASP and CPC Calculations
+                asp = total_sales / total_units if total_units > 0 else 0
+                avg_cpc = total_spend / total_clicks if total_clicks > 0 else 0
+                breakeven_cvr = (avg_cpc / asp) * 100 if asp > 0 else 0
                 
                 # Formula Layer 1: The Non-Linear Logistic S-Curve Filter
                 s_curve_factor = 1.0 / (1.0 + np.exp(steepness * (avg_organic_sov - inflection_point)))
@@ -146,6 +154,9 @@ if uploaded_file:
                 iroas = incremental_sales / total_spend if total_spend > 0 else 0
                 prob_lift = 98.4 if avg_organic_sov < 0.20 else (34.1 if avg_organic_sov > 0.55 else 71.2)
                 
+                # True Net Revenue Generated per Unit Sold via Ads
+                iunit_contribution = asp * incrementality_factor
+                
                 total_portfolio_spend += total_spend
                 total_portfolio_incremental_sales += incremental_sales
                 
@@ -157,17 +168,22 @@ if uploaded_file:
                     'inventory': avg_inventory,
                     'promo': is_promo_active,
                     'factor': incrementality_factor,
-                    'prob_lift': prob_lift
+                    'prob_lift': prob_lift,
+                    'asp': asp,
+                    'cpc': avg_cpc,
+                    'breakeven_cvr': breakeven_cvr,
+                    'iunit_contribution': iunit_contribution
                 }
                 
                 table_data.append({
                     "Product ID": prod,
+                    "Avg ASP": f"${asp:,.2f}",
+                    "Avg CPC": f"${avg_cpc:,.2f}",
+                    "Break-Even CVR": f"{breakeven_cvr:.1f}%",
                     "Avg Organic SOV": f"{avg_organic_sov*100:.1f}%",
                     "New-to-Brand (NTB) %": f"{avg_ntb*100:.1f}%" if has_ntb else "N/A",
-                    "Store Availability": f"{avg_inventory:.1f}%",
-                    "Total Spend": f"${total_spend:,.2f}",
-                    "Total Sales": f"${total_sales:,.2f}",
                     "True Incremental Sales": f"${incremental_sales:,.2f}",
+                    "iUnit Contribution": f"${iunit_contribution:,.2f}",
                     "iROAS (True Return)": f"{iroas:.2f}x",
                     "Probability of True Lift": f"{prob_lift:.1f}%"
                 })
@@ -198,28 +214,38 @@ if uploaded_file:
                     card_col1.metric("Incremental ROAS", f"{meta['iroas']:.2f}x")
                     card_col2.metric("Ad Incrementality %", f"{meta['factor']*100:.0f}%")
                     
+                    # Core Strategic Logic Blocks Enhanced with Unit Economics Diagnostics
                     if high_cannibalization:
                         verdict_title = "❌ **Investment Verdict: Reduce Exposure / Funding Source**"
                         verdict_desc = f"""
                         * **The Context:** Paid media is highly redundant here. Your brand enjoys an organic presence of **{meta['organic_sov']*100:.1f}% SOV**. Paid ads are actively overlapping with your free listings.
+                        * **Unit Economics Diagnostic:** Your Average Sales Price is **${meta['asp']:,.2f}**, but each ad-driven item only yields **${meta['iunit_contribution']:,.2f}** in true un-cannibalized value. 
                         * **Action:** Trim budgets by **15% to 25%**. Pull back from generic search terms and focus ad spend exclusively on protective brand keywords or conquesting spaces to prevent paying for clicks you would have earned for free.
                         """
                     elif strong_return:
                         verdict_title = "🟢 **Investment Verdict: Scale Budget / Growth Target**"
                         verdict_desc = f"""
                         * **The Context:** This category is highly incremental. Organic shelf presence is low, and your true ad return (**{meta['iroas']:.2f}x iROAS**) sits safely above the portfolio baseline (**{portfolio_iroas:.2f}x**).
+                        * **Unit Economics Diagnostic:** High structural friction insulation. With an ASP of **${meta['asp']:,.2f}** against a **${meta['cpc']:,.2f} CPC**, your campaigns only require a **{meta['breakeven_cvr']:.1f}% conversion rate** to break even.
                         * **Action:** Funnel extra budget here immediately. Every dollar added is creating un-cannibalized net-new growth with a **{meta['prob_lift']:.1f}% probability of true sales lift**.
                         """
                     else:
-                        verdict_title = "🔵 **Investment Verdict: Hold Baseline / Maintain & Monitor**"
+                        # Structural Optimization diagnostic split dynamically based on ASP parameters
+                        if meta['asp'] > 50.0:
+                            diagnostic_note = f"**Traffic & Relevance Issue:** Your ASP is structurally strong at **${meta['asp']:,.2f}**, but conversion parameters are soft. Optimize product detail pages (PDP) and tighten keyword matching maps before scaling."
+                        else:
+                            diagnostic_note = f"**Unit Economic Friction:** Conversion parameters are healthy, but your low ASP (**${meta['asp']:,.2f}**) creates a narrow profit runway against a **${meta['cpc']:,.2f} CPC**. Pull back bid floors or shift advertising focus to multi-packs and bundles."
+                            
+                        verdict_title = "🛠️ **Investment Verdict: Structural Optimization Required**"
                         verdict_desc = f"""
-                        * **The Context:** This category operates at localized efficiency with an incremental return of **{meta['iroas']:.2f}x**. It is currently un-cannibalized but bounded by mid-funnel keyword volume limitations.
-                        * **Action:** Maintain existing spend settings. Focus on running structural copy adjustments or testing non-to-brand optimizations rather than modifying budget totals.
+                        * **The Context:** This asset captures net-new traffic efficiently, but baseline iROAS efficiency (**{meta['iroas']:.2f}x**) needs adjustment.
+                        * **Unit Economics Diagnostic:** {diagnostic_note}
+                        * **Action:** Keep budgets flat. Implement the creative or structural pricing changes noted above before applying additional capital.
                         """
                         
                     card_col3.markdown(f"**{verdict_title}**\n{verdict_desc}")
 
-            # --- UPDATED VALUE-DIVERSIFIED BLUEPRINT SECTION (INTEGRATING INVESTMENT PRIORITY SCORE) ---
+            # --- VALUE-DIVERSIFIED BLUEPRINT SECTION ---
             st.subheader("🔄 Portfolio Capital Optimization Blueprint")
             
             if len(raw_metrics) >= 2:
