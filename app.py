@@ -23,9 +23,9 @@ category_type = st.sidebar.selectbox(
 
 # Advanced S-Curve tuning parameter toggles hidden cleanly in sidebar expander
 with st.sidebar.expander("⚙️ Advanced S-Curve Coefficients"):
-    inflection_point = st.slider("Curve Inflection Point (x₀)", 0.05, 0.35, 0.20, 0.05, 
+    inflection_point = st.slider("Curve Inflection Point (x₀)", 0.20, 0.60, 0.40, 0.05, 
                                  help="The Organic SOV point where incrementality degradation accelerates fastest.")
-    steepness = st.slider("Curve Decay Steepness (k)", 1.0, 10.0, 5.5, 0.5,
+    steepness = st.slider("Curve Decay Steepness (k)", 5.0, 15.0, 10.0, 0.5,
                           help="Higher numbers enforce harsher cannibalization penalties when crossing the inflection threshold.")
 
 def clean_numeric_column(series):
@@ -136,7 +136,7 @@ if uploaded_file:
                 
                 is_promo_active = False
                 if has_promo:
-                    promo_col = 'promo_status' if 'promo_status' in df.columns else 'promo_flag'
+                    promo_col = 'promo_status' if 'promo_flag' not in df.columns else 'promo_flag'
                     is_promo_active = prod_data[promo_col].astype(str).str.lower().str.contains('active|yes|1').any()
                     if is_promo_active:
                         incrementality_factor = min(0.98, incrementality_factor * 1.05)
@@ -188,11 +188,6 @@ if uploaded_file:
             # --- EXPANDED STRATEGIC MEDIA DIRECTIVES (RECOMMENDATIONS MODULE) ---
             st.header("🎯 Strategic Media Directives")
             
-            funding_sources = []
-            growth_targets = []
-            
-            st.subheader("📋 Category-by-Category Investment Verdicts")
-            
             for prod, meta in raw_metrics.items():
                 high_cannibalization = meta['organic_sov'] >= inflection_point
                 strong_return = meta['iroas'] >= portfolio_iroas if portfolio_iroas > 0 else meta['iroas'] > 1.5
@@ -204,14 +199,12 @@ if uploaded_file:
                     card_col2.metric("Ad Incrementality %", f"{meta['factor']*100:.0f}%")
                     
                     if high_cannibalization:
-                        funding_sources.append((prod, meta['iroas']))
                         verdict_title = "❌ **Investment Verdict: Reduce Exposure / Funding Source**"
                         verdict_desc = f"""
                         * **The Context:** Paid media is highly redundant here. Your brand enjoys an organic presence of **{meta['organic_sov']*100:.1f}% SOV**. Paid ads are actively overlapping with your free listings.
                         * **Action:** Trim budgets by **15% to 25%**. Pull back from generic search terms and focus ad spend exclusively on protective brand keywords or conquesting spaces to prevent paying for clicks you would have earned for free.
                         """
                     elif strong_return:
-                        growth_targets.append((prod, meta['iroas']))
                         verdict_title = "🟢 **Investment Verdict: Scale Budget / Growth Target**"
                         verdict_desc = f"""
                         * **The Context:** This category is highly incremental. Organic shelf presence is low, and your true ad return (**{meta['iroas']:.2f}x iROAS**) sits safely above the portfolio baseline (**{portfolio_iroas:.2f}x**).
@@ -226,35 +219,81 @@ if uploaded_file:
                         
                     card_col3.markdown(f"**{verdict_title}**\n{verdict_desc}")
 
-            # --- UPDATED VALUE-DIVERSIFIED BLUEPRINT SECTION ---
+            # --- UPDATED VALUE-DIVERSIFIED BLUEPRINT SECTION (INTEGRATING INVESTMENT PRIORITY SCORE) ---
             st.subheader("🔄 Portfolio Capital Optimization Blueprint")
             
             if len(raw_metrics) >= 2:
-                if funding_sources and growth_targets:
-                    st.success("💡 **Diversified Capital Migration Plan:** To scale net-new portfolio demand without increasing your total ad spend, harvest under-performing budget across lower-performing lines and spread your investments across a diversified group of high-incrementality targets:")
+                st.markdown("""
+                This blueprint evaluates assets via a unified **Investment Priority Score**, combining current baseline financial efficiency with down-funnel scaling headroom:
+                $$\\text{Investment Priority Score} = \\text{iROAS} \\times \\text{Ad Incrementality \\%}$$
+                """)
+                
+                blueprint_table = []
+                scale_targets = []
+                cap_targets = []
+                optimize_targets = []
+                defund_sources = []
+                
+                # Assign categories to the unified 2x2 framework via the custom matrix rule-base
+                for prod, meta in raw_metrics.items():
+                    p_iroas = meta['iroas']
+                    p_inc_factor = meta['factor']
+                    priority_score = p_iroas * p_inc_factor
                     
-                    # 1. Clear summary of all accounts losing spend
-                    st.markdown("### 📉 1. Targeted Budget Reductions (Pull Back Capital):")
-                    sorted_sources = sorted(funding_sources, key=lambda x: x[1])
-                    for source_name, source_iroas in sorted_sources:
-                        st.markdown(f"* **Divert funds away from `{source_name}`** (Current Return: **{source_iroas:.2f}x iROAS**). Scale down exposure here due to severe organic cannibalization loops.")
-                    
-                    # 2. Comprehensive, proportional multi-category investment guide
-                    st.markdown("### 📈 2. Proportional Portfolio Reallocation Plan (Invest Capital):")
-                    st.markdown("Deploy your harvested ad dollars across the following high-performing targets simultaneously. Capital distribution is **scaled proportionally**—the higher the category's true return profile, the larger its share of the reallocated investment pool:")
-                    
-                    total_target_iroas = sum(t[1] for t in growth_targets)
-                    sorted_targets = sorted(growth_targets, key=lambda x: x[1], reverse=True)
-                    
-                    for target_name, target_iroas in sorted_targets:
-                        # Derive exact mathematical priority weighting based on relative iROAS strengths
-                        alloc_weight = (target_iroas / total_target_iroas) * 100 if total_target_iroas > 0 else 0
+                    if p_iroas >= 3.0 and p_inc_factor >= 0.40:
+                        quadrant = "🚀 Aggressive Scale"
+                        scale_targets.append((prod, p_iroas, p_inc_factor, priority_score))
+                    elif p_iroas >= 3.0 and p_inc_factor < 0.40:
+                        quadrant = "💰 Efficiency Max / Cap Budget"
+                        cap_targets.append((prod, p_iroas, p_inc_factor, priority_score))
+                    elif p_iroas < 3.0 and p_inc_factor >= 0.40:
+                        quadrant = "🛠️ Structural Optimization"
+                        optimize_targets.append((prod, p_iroas, p_inc_factor, priority_score))
+                    else:
+                        quadrant = "❌ Defund / Defend Only"
+                        defund_sources.append((prod, p_iroas, p_inc_factor, priority_score))
                         
-                        st.markdown(f"* **Deploy to `{target_name}`** (Current Return: **{target_iroas:.2f}x iROAS**)")
-                        st.markdown(f"  * *Reallocation Weight Priority:* **{alloc_weight:.1f}%** of all harvested capital.")
-                        st.markdown(f"  * *Strategic Focus:* This category maintains an exceptional headroom index. Funneling **{alloc_weight:.1f}%** of your available migration capital directly captures market share and expands clean incremental volume safely above your portfolio baseline.")
-                else:
-                    st.info("ℹ️ **Funding Equilibrium Reached:** All active product items across your profile are generating tightly balanced incrementality metrics. Cross-category budget shifting plays are not necessary at this time.")
+                    blueprint_table.append({
+                        "Category / Product ID": prod,
+                        "True iROAS": f"{p_iroas:.2f}x",
+                        "Ad Incrementality %": f"{p_inc_factor * 100:.1f}%",
+                        "Investment Priority Score": f"{priority_score:.2f}",
+                        "Matrix Allocation Quadrant": quadrant
+                    })
+                
+                # Render the unified matrix overview table
+                st.dataframe(pd.DataFrame(blueprint_table), use_container_width=True)
+                st.success("💡 **Actionable Capital Migration Blueprint Execution:**")
+                
+                # 1. DEFUND / DEFEND QUADRANT (PULL BACK CAPITAL)
+                if defund_sources:
+                    st.markdown("### 📉 1. Targeted Budget Reductions (Harvest Scaling Capital):")
+                    for name, r, f, score in sorted(defund_sources, key=lambda x: x[3]):
+                        st.markdown(f"* **Divert funds away from `{name}`** (Priority Score: **{score:.2f}** | iROAS: {r:.2f}x | Inc: {f*100:.0f}%). Low efficiency combined with severe cannibalization. Trim non-branded exposure to harvest capital.")
+                
+                # 2. EFFICIENCY MAX QUADRANT (HOLD BASELINE)
+                if cap_targets:
+                    st.markdown("### 🔒 2. Maintain Baseline & Cap Spend (Protect High iROAS):")
+                    for name, r, f, score in sorted(cap_targets, key=lambda x: x[3], reverse=True):
+                        st.markdown(f"* **Lock current budget and cap spend on `{name}`** (Priority Score: **{score:.2f}** | iROAS: {r:.2f}x | Inc: {f*100:.0f}%). This asset is highly profitable today but saturated. Do not cut funding, but do not push extra investment into it.")
+                
+                # 3. AGGRESSIVE SCALE QUADRANT (DEPLOY HARVESTED CAPITAL PROPORTIONALLY VIA SCORE WEIGHTS)
+                if scale_targets:
+                    st.markdown("### 📈 3. Proportional Portfolio Reallocation Plan (Invest Capital):")
+                    st.markdown("Deploy harvested scaling capital into the following high-headroom target areas simultaneously. Reallocation percentages are **scaled dynamically based on their Investment Priority Scores**:")
+                    
+                    total_priority_sum = sum(t[3] for t in scale_targets)
+                    for name, r, f, score in sorted(scale_targets, key=lambda x: x[3], reverse=True):
+                        alloc_weight = (score / total_priority_sum) * 100 if total_priority_sum > 0 else 0
+                        st.markdown(f"* **Route Capital to `{name}`** (Priority Score: **{score:.2f}** | iROAS: {r:.2f}x | Inc: {f*100:.0f}%)")
+                        st.markdown(f"  * *Reallocation Weight Priority:* **{alloc_weight:.1f}%** of all available migration capital.")
+                        st.markdown(f"  * *Strategic Focus:* High profit profile matched with open, unsaturated structural headroom.")
+                
+                # 4. STRUCTURAL OPTIMIZATION QUADRANT (MONITOR & FIX CONVERSION RATIOS)
+                if optimize_targets:
+                    st.markdown("### 🛠️ 4. Structural Conversion Optimization (Hold & Improve):")
+                    for name, r, f, score in sorted(optimize_targets, key=lambda x: x[3], reverse=True):
+                        st.markdown(f"* **Maintain flat ad spend on `{name}`** (Priority Score: **{score:.2f}** | iROAS: {r:.2f}x | Inc: {f*100:.0f}%). Capturing net-new traffic efficiently, but low core landing-page conversion holds back overall iROAS. Optimize content before scaling.")
             else:
                 st.warning("⚠️ Optimization Blueprint requires a minimum of 2 unique categories inside the uploaded data file to build cross-budget migration scenarios.")
 
@@ -319,7 +358,7 @@ if uploaded_file:
                 The structural scaling weight $\\beta_{{\\text{{cat}}}}$ is completely dependent on your chosen **Global Engine Calibration**:
                 
                 1. **Consumables / CPG Settings (Active Hyperparameter $\\beta_{{\\text{{CPG}}}} = 0.20$):** High baseline household purchase frequencies indicate that normal traffic contains systemic organic retention loops. A strong NTB score here is an excellent mathematical signature of competitive market conquesting. Thus, the engine rewards the profile with a generous linear recovery bonus up to $+20\\%$.
-                2. **Durables / Electronics Settings (Active Hyperparameter $\\beta_{{\\text{{Durable}}}} = 0.05$):** Long multi-year replacement lifecycles mean repeat organic buying behaviors are naturally absent; nearly all clean transactions map as "New-To-Brand" by default. To insulate calculations from artificial inflation, the NTB credit transmission vector is dampened down to a maximum cap of $+5\\%$.
+                2. **Durables / Electronics Settings (Active Hyperparameter $\\beta_{{\\text{{Durable}}}} = 0.05$):** Long multi-year replacement lifecycles mean repeat organic buying behaviors are naturally absent; nearly all clean transactions map as \"New-To-Brand\" by default. To insulate calculations from artificial inflation, the NTB credit transmission vector is dampened down to a maximum cap of $+5\\%$.
                 
                 ---
                 
