@@ -8,7 +8,7 @@ st.title("📊 Retail Media Incrementality Engine")
 st.subheader("Advanced Bayesian Causal Inference Dashboard (Unified Model with ASP Economics)")
 
 st.markdown("""
-This engine isolates true media lift from organic cannibalization by replacing rigid rules with a non-linear **Logistic S-Curve**, a **Category-Aware New-to-Brand (NTB)** balancing matrix, and **ASP Unit Economics**.
+This engine treats true media lift from organic cannibalization by replacing rigid rules with a non-linear **Logistic S-Curve**, a **Category-Aware New-to-Brand (NTB)** balancing matrix, and **ASP Unit Economics**.
 """)
 
 # --- SIDEBAR CONTROLS ---
@@ -343,7 +343,7 @@ if uploaded_file:
                     if not promo_found:
                         st.write("ℹ️ **Promo Status:** No active price promotions are currently paired with un-tapped market lift capacity.")
 
-            # --- FORMULA EXPLAINER GUIDES (FULLY UPDATED MATH PAPERS SECTION) ---
+            # --- FORMULA EXPLAINER GUIDES (LATEX SYNTAX BUG RESOLVED) ---
             st.header("🧠 Behind the Curtains (How the Math Works)")
             with st.expander("Click to open the Whitepaper-Grade Formula & Methodology Guide", expanded=False):
                 st.markdown(f"""
@@ -413,11 +413,11 @@ if uploaded_file:
                 
                 #### A. Average Sales Price (ASP) Extraction
                 To calculate transactional volume shifts independent of package variations, pricing curves are derived dynamically:
-                $$\\text{{ASP}} = \\frac{\\text{{Total Attributed Revenue}}}{\\text{{Total Units Sold}}}$$
+                $$\\text{{ASP}} = \\frac{{ \\text{{Total Attributed Revenue}} }}{{ \\text{{Total Units Sold}} }}$$
                 
                 #### B. The CPC-to-ASP Friction Index (Break-Even CVR Floor)
                 The absolute conversion barrier below which a paid media click structurally consumes product profitability is formulated as:
-                $$\\text{{Break-Even CVR}} = \\left( \\frac{\\text{{Average CPC}}}{\\text{{ASP}}} \\right) \\times 100$$
+                $$\\text{{Break-Even CVR}} = \\left( \\frac{{ \\text{{Average CPC}} }}{{ \\text{{ASP}} }} \\right) \\times 100$$
                 *Economic Rationale:* Categories with narrow baseline dynamics (low ASP paired with highly competitive high-CPC bidding environments) display a structural vulnerability to ad spend leaks. They require a drastically higher conversion rate floor to safeguard net profit.
                 
                 #### C. Isolated Incremental Unit Contribution (iUnit Contribution)
