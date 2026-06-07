@@ -343,7 +343,7 @@ if uploaded_file:
                     if not promo_found:
                         st.write("ℹ️ **Promo Status:** No active price promotions are currently paired with un-tapped market lift capacity.")
 
-            # --- FORMULA EXPLAINER GUIDES ---
+            # --- FORMULA EXPLAINER GUIDES (FULLY UPDATED MATH PAPERS SECTION) ---
             st.header("🧠 Behind the Curtains (How the Math Works)")
             with st.expander("Click to open the Whitepaper-Grade Formula & Methodology Guide", expanded=False):
                 st.markdown(f"""
@@ -405,6 +405,30 @@ if uploaded_file:
                 To preserve strict auditing integrity across all category variations, the finished lift coefficient is compressed via a global probability clipping function:
                 $$\\alpha_{{\\text{{final}}}} = \\min\\left(0.98, \\max\\left(0.05, \\alpha_{{\\text{{lift}}}}\\right)\\right)$$
                 This step guarantees that under no structural anomaly can an ad line-item be stripped of all credit ($< 5\\%$) or given full unmitigated credit ($> 98\\%$), reflecting standard real-world operational baseline parameters.
+                
+                ---
+                
+                ### 🪙 5. Unit Economics, Transactional Friction, & Portfolio Priority Mechanics
+                To evaluate corporate budget distributions from an efficiency baseline rather than basic platform attribution, the engine maps structural transaction realities against our isolated causal lift coefficient ($\\alpha_{{\\text{{final}}}}$):
+                
+                #### A. Average Sales Price (ASP) Extraction
+                To calculate transactional volume shifts independent of package variations, pricing curves are derived dynamically:
+                $$\\text{{ASP}} = \\frac{\\text{{Total Attributed Revenue}}}{\\text{{Total Units Sold}}}$$
+                
+                #### B. The CPC-to-ASP Friction Index (Break-Even CVR Floor)
+                The absolute conversion barrier below which a paid media click structurally consumes product profitability is formulated as:
+                $$\\text{{Break-Even CVR}} = \\left( \\frac{\\text{{Average CPC}}}{\\text{{ASP}}} \\right) \\times 100$$
+                *Economic Rationale:* Categories with narrow baseline dynamics (low ASP paired with highly competitive high-CPC bidding environments) display a structural vulnerability to ad spend leaks. They require a drastically higher conversion rate floor to safeguard net profit.
+                
+                #### C. Isolated Incremental Unit Contribution (iUnit Contribution)
+                To determine the true, un-cannibalized cash baseline delivered back to warehouse assets from an isolated ad action, the engine filters macro price points using our causal lift modifier:
+                $$\\text{{iUnit Contribution}} = \\text{{ASP}} \\times \\alpha_{{\\text{{final}}}}$$
+                This metric strips out baseline ecosystem noise, identifying how much raw dollar cash flow is driven strictly by media intervention.
+                
+                #### D. The Investment Priority Score Algorithm
+                To solve allocation paradoxes where massive mature lines mask an inability to acquire net-new traffic, macro investment targets are dynamically prioritized across a non-linear velocity vector:
+                $$\\text{{Investment Priority Score}} = \\text{{iROAS}} \\times \\alpha_{{\\text{{final}}}}$$
+                *Economic Rationale:* This composite index weighs current transactional performance against structural headroom. High baseline returns paired with unsaturated shelf opportunities generate exponential scores, signaling to capital routing models that those lines are capable of processing marginal scaling dollars efficiently without hitting a cannibalization wall.
                 """)
                 
         except Exception as e:
