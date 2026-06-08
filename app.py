@@ -138,7 +138,7 @@ if uploaded_file:
                 avg_inventory = 100.0
                 if has_inventory:
                     avg_inventory = float(prod_data['inv_clean'].mean())
-                    if avg_inventory < 80.0:
+                    if avg_inventory < 70.0:
                         incrementality_factor = min(0.98, incrementality_factor * 1.12)
                         low_inventory_alerts.append(f"⚠️ **{prod}** average distribution dropped to {avg_inventory:.1f}%. Ad baseline modified for out-of-stock anomalies.")
                 
