@@ -216,18 +216,19 @@ if uploaded_file:
                     
                     # Core Strategic Logic Blocks Enhanced with Unit Economics Diagnostics
                     if high_cannibalization:
-                        verdict_title = "❌ **Investment Verdict: Reduce Exposure / Funding Source**"
+                        verdict_title = "❌ **Investment Verdict: Reduce Exposure / Budget Cap Required**"
                         verdict_desc = f"""
-                        * **The Context:** Paid media is highly redundant here. Your brand enjoys an organic presence of **{meta['organic_sov']*100:.1f}% SOV**. Paid ads are actively overlapping with your free listings.
-                        * **Unit Economics Diagnostic:** Your Average Sales Price is **${meta['asp']:,.2f}**, but each ad-driven item only yields **${meta['iunit_contribution']:,.2f}** in true un-cannibalized value. 
-                        * **Action:** Trim budgets by **15% to 25%**. Pull back from generic search terms and focus ad spend exclusively on protective brand keywords or conquesting spaces to prevent paying for clicks you would have earned for free.
+                        The Context: Paid media is highly redundant here. Your brand already dominates the search shelf with an organic presence of **{meta['organic_sov']*100:.1f}% SOV**. 
+                        Unit Economics Diagnostic: Your Average Sales Price is **${meta['asp']:,.2f}**, but because ads are overlapping with free listings, each ad-driven item only yields **${meta['iunit_contribution']:,.2f}** in true, net-new value.
+                        The Correct Action: Trim budgets by **15% to 25%**. Shift capital away from standard branded keywords where you are actively paying for clicks you would have earned for free organically. 
+                        The Exception: Restrict remaining spend *exclusively* to **Conquesting spaces** (intercepting competitor traffic where your organic footprint is zero) or a minimal **Brand Defense floor** strictly to block competitors from hijacking your top organic spots. Do not over-fund comfortable branded traffic.
                         """
                     elif strong_return:
                         verdict_title = "🟢 **Investment Verdict: Scale Budget / Growth Target**"
                         verdict_desc = f"""
-                        * **The Context:** This category is highly incremental. Organic shelf presence is low, and your true ad return (**{meta['iroas']:.2f}x iROAS**) sits safely above the portfolio baseline (**{portfolio_iroas:.2f}x**).
-                        * **Unit Economics Diagnostic:** High structural friction insulation. With an ASP of **${meta['asp']:,.2f}** against a **${meta['cpc']:,.2f} CPC**, your campaigns only require a **{meta['breakeven_cvr']:.1f}% conversion rate** to break even.
-                        * **Action:** Funnel extra budget here immediately. Every dollar added is creating un-cannibalized net-new growth with a **{meta['prob_lift']:.1f}% probability of true sales lift**.
+                        The Context: This category is highly incremental. Organic shelf presence is low, and your true ad return (**{meta['iroas']:.2f}x iROAS**) sits safely above the portfolio baseline (**{portfolio_iroas:.2f}x**).
+                        Unit Economics Diagnostic: High structural friction insulation. With an ASP of **${meta['asp']:,.2f}** against a **${meta['cpc']:,.2f} CPC**, your campaigns only require a **{meta['breakeven_cvr']:.1f}% conversion rate** to break even.
+                        Action: Funnel extra budget here immediately. Every dollar added is creating un-cannibalized net-new growth with a **{meta['prob_lift']:.1f}% probability of true sales lift**.
                         """
                     else:
                         # Structural Optimization diagnostic split dynamically based on ASP parameters
@@ -238,9 +239,9 @@ if uploaded_file:
                             
                         verdict_title = "🛠️ **Investment Verdict: Structural Optimization Required**"
                         verdict_desc = f"""
-                        * **The Context:** This asset captures net-new traffic efficiently, but baseline iROAS efficiency (**{meta['iroas']:.2f}x**) needs adjustment.
-                        * **Unit Economics Diagnostic:** {diagnostic_note}
-                        * **Action:** Keep budgets flat. Implement the creative or structural pricing changes noted above before applying additional capital.
+                        The Context: This asset captures net-new traffic efficiently, but baseline iROAS efficiency (**{meta['iroas']:.2f}x**) needs adjustment.
+                        Unit Economics Diagnostic: {diagnostic_note}
+                        Action: Keep budgets flat. Implement the creative or structural pricing changes noted above before applying additional capital.
                         """
                         
                     card_col3.markdown(f"**{verdict_title}**\n{verdict_desc}")
