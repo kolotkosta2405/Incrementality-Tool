@@ -201,36 +201,78 @@ if uploaded_file:
             
             st.info(f"💬 **The Confidence Statement:** Based on non-linear S-curve processing adjusted for your customized **{category_type}** parameters, this profile isolated **${total_portfolio_incremental_sales:,.2f}** in direct net-new consumer demand.")
             
-            # --- EXPANDED STRATEGIC MEDIA DIRECTIVES (RECOMMENDATIONS MODULE) ---
+            # --- EXPANDED STRATEGIC MEDIA DIRECTIVES & BLUEPRINT SECTION ---
             st.header("🎯 Strategic Media Directives")
             
+            # Initialize Blueprint lists before the loop
+            blueprint_table = []
+            scale_targets = []
+            cap_targets = []
+            optimize_targets = []
+            defund_sources = []
+            
+            # ONE UNIFIED LOOP: Calculates quadrant, builds lists, and renders the UI card
             for prod, meta in raw_metrics.items():
-                high_cannibalization = meta['organic_sov'] >= inflection_point
-                strong_return = meta['iroas'] >= portfolio_iroas if portfolio_iroas > 0 else meta['iroas'] > 1.5
+                p_iroas = meta['iroas']
+                p_inc_factor = meta['factor']
+                priority_score = p_iroas * p_inc_factor
                 
-                with st.expander(f"Analysis Profile: {prod}", expanded=True):
+                # 1. CORE UNIFIED LOGIC: Define the Quadrant FIRST
+                if p_iroas >= 3.0 and p_inc_factor >= 0.40:
+                    quadrant = "🚀 Aggressive Scale"
+                    scale_targets.append((prod, p_iroas, p_inc_factor, priority_score))
+                elif p_iroas >= 3.0 and p_inc_factor < 0.40:
+                    quadrant = "💰 Efficiency Max / Cap Budget"
+                    cap_targets.append((prod, p_iroas, p_inc_factor, priority_score))
+                elif p_iroas < 3.0 and p_inc_factor >= 0.40:
+                    quadrant = "🛠️ Structural Optimization"
+                    optimize_targets.append((prod, p_iroas, p_inc_factor, priority_score))
+                else:
+                    quadrant = "❌ Defund / Defend Only"
+                    defund_sources.append((prod, p_iroas, p_inc_factor, priority_score))
+                    
+                blueprint_table.append({
+                    "Category / Product ID": prod,
+                    "True iROAS": f"{p_iroas:.2f}x",
+                    "Ad Incrementality %": f"{p_inc_factor * 100:.1f}%",
+                    "Investment Priority Score": f"{priority_score:.2f}",
+                    "Matrix Allocation Quadrant": quadrant
+                })
+                
+                # 2. RENDER THE UI CARD USING THE EXACT SAME QUADRANT
+                with st.expander(f"Analysis Profile: {prod} | {quadrant}", expanded=True):
                     card_col1, card_col2, card_col3 = st.columns([1, 1, 2])
                     
-                    card_col1.metric("Incremental ROAS", f"{meta['iroas']:.2f}x")
-                    card_col2.metric("Ad Incrementality %", f"{meta['factor']*100:.0f}%")
+                    card_col1.metric("Incremental ROAS", f"{p_iroas:.2f}x")
+                    card_col2.metric("Ad Incrementality %", f"{p_inc_factor*100:.0f}%")
                     
-                    # Core Strategic Logic Blocks Enhanced with Unit Economics Diagnostics
-                    if high_cannibalization:
+                    # 3. TEXT ALIGNMENT: 1:1 Mapping to the Quadrant definitions
+                    if quadrant == "❌ Defund / Defend Only":
                         verdict_title = "❌ **Investment Verdict: Reduce Exposure / Budget Cap Required**"
                         verdict_desc = f"""
-                        The Context: Paid media is highly redundant here. Your brand already dominates the search shelf with an organic presence of **{meta['organic_sov']*100:.1f}% SOV**. 
-                        Unit Economics Diagnostic: Your Average Sales Price is **${meta['asp']:,.2f}**, but because ads are overlapping with free listings, each ad-driven item only yields **${meta['iunit_contribution']:,.2f}** in true, net-new value.
-                        The Correct Action: Trim budgets by **15% to 25%**. Shift capital away from standard branded keywords where you are actively paying for clicks you would have earned for free organically. 
-                        The Exception: Restrict remaining spend *exclusively* to **Conquesting spaces** (intercepting competitor traffic where your organic footprint is zero) or a minimal **Brand Defense floor** strictly to block competitors from hijacking your top organic spots. Do not over-fund comfortable branded traffic.
+                        * **The Context:** Paid media is highly redundant here. Your brand already dominates the search shelf with an organic presence of **{meta['organic_sov']*100:.1f}% SOV**. 
+                        * **Unit Economics Diagnostic:** Your Average Sales Price is **${meta['asp']:,.2f}**, but because ads are overlapping with free listings, each ad-driven item only yields **${meta['iunit_contribution']:,.2f}** in true, net-new value.
+                        * **The Correct Action:** Trim budgets by **15% to 25%**. Shift capital away from standard branded keywords where you are actively paying for clicks you would have earned for free organically. 
+                        * **The Exception:** Restrict remaining spend *exclusively* to **Conquesting spaces** (intercepting competitor traffic where your organic footprint is zero) or a minimal **Brand Defense floor** strictly to block competitors from hijacking your top organic spots. Do not over-fund comfortable branded traffic.
                         """
-                    elif strong_return:
+                        
+                    elif quadrant == "🚀 Aggressive Scale":
                         verdict_title = "🟢 **Investment Verdict: Scale Budget / Growth Target**"
                         verdict_desc = f"""
-                        The Context: This category is highly incremental. Organic shelf presence is low, and your true ad return (**{meta['iroas']:.2f}x iROAS**) sits safely above the portfolio baseline (**{portfolio_iroas:.2f}x**).
-                        Unit Economics Diagnostic: High structural friction insulation. With an ASP of **${meta['asp']:,.2f}** against a **${meta['cpc']:,.2f} CPC**, your campaigns only require a **{meta['breakeven_cvr']:.1f}% conversion rate** to break even.
-                        Action: Funnel extra budget here immediately. Every dollar added is creating un-cannibalized net-new growth with a **{meta['prob_lift']:.1f}% probability of true sales lift**.
+                        * **The Context:** This category is highly incremental. Organic shelf presence is low, and your true ad return (**{p_iroas:.2f}x iROAS**) sits safely in the high-efficiency zone.
+                        * **Unit Economics Diagnostic:** High structural friction insulation. With an ASP of **${meta['asp']:,.2f}** against a **${meta['cpc']:,.2f} CPC**, your campaigns only require a **{meta['breakeven_cvr']:.1f}% conversion rate** to break even.
+                        * **Action:** Funnel extra budget here immediately. Every dollar added is creating un-cannibalized net-new growth with a **{meta.get('prob_lift', 0):.1f}% probability of true sales lift**.
                         """
-                    else:
+
+                    elif quadrant == "💰 Efficiency Max / Cap Budget":
+                        verdict_title = "💰 **Investment Verdict: Lock Baseline / Cap Spend**"
+                        verdict_desc = f"""
+                        * **The Context:** Generating strong overall efficiency (**{p_iroas:.2f}x iROAS**), but Ad Incrementality has dropped to **{p_inc_factor*100:.1f}%** due to high organic overlap.
+                        * **Unit Economics Diagnostic:** While top-line margins look good, the S-Curve cannibalization penalty is active. The marginal return on the *next* dollar spent is severely degraded.
+                        * **Action:** Lock the current budget floor to protect the profitable baseline, but DO NOT scale. Pumping more ad dollars here will mostly swallow up free organic conversions.
+                        """
+                        
+                    elif quadrant == "🛠️ Structural Optimization":
                         # Structural Optimization diagnostic split dynamically based on ASP parameters
                         if meta['asp'] > 50.0:
                             diagnostic_note = f"**Traffic & Relevance Issue:** Your ASP is structurally strong at **${meta['asp']:,.2f}**, but conversion parameters are soft. Optimize product detail pages (PDP) and tighten keyword matching maps before scaling."
@@ -239,12 +281,12 @@ if uploaded_file:
                             
                         verdict_title = "🛠️ **Investment Verdict: Structural Optimization Required**"
                         verdict_desc = f"""
-                        The Context: This asset captures net-new traffic efficiently, but baseline iROAS efficiency (**{meta['iroas']:.2f}x**) needs adjustment.
-                        Unit Economics Diagnostic: {diagnostic_note}
-                        Action: Keep budgets flat. Implement the creative or structural pricing changes noted above before applying additional capital.
+                        * **The Context:** This asset captures net-new traffic efficiently, but baseline iROAS efficiency (**{p_iroas:.2f}x**) needs adjustment.
+                        * **Unit Economics Diagnostic:** {diagnostic_note}
+                        * **Action:** Keep budgets flat. Implement the creative or structural pricing changes noted above before applying additional capital.
                         """
                         
-                    card_col3.markdown(f"**{verdict_title}**\n{verdict_desc}")
+                    card_col3.markdown(f"{verdict_title}\n{verdict_desc}")
 
             # --- VALUE-DIVERSIFIED BLUEPRINT SECTION ---
             st.subheader("🔄 Portfolio Capital Optimization Blueprint")
@@ -254,39 +296,6 @@ if uploaded_file:
                 This blueprint evaluates assets via a unified **Investment Priority Score**, combining current baseline financial efficiency with down-funnel scaling headroom:
                 $$\\text{Investment Priority Score} = \\text{iROAS} \\times \\text{Ad Incrementality \\%}$$
                 """)
-                
-                blueprint_table = []
-                scale_targets = []
-                cap_targets = []
-                optimize_targets = []
-                defund_sources = []
-                
-                # Assign categories to the unified 2x2 framework via the custom matrix rule-base
-                for prod, meta in raw_metrics.items():
-                    p_iroas = meta['iroas']
-                    p_inc_factor = meta['factor']
-                    priority_score = p_iroas * p_inc_factor
-                    
-                    if p_iroas >= 3.0 and p_inc_factor >= 0.40:
-                        quadrant = "🚀 Aggressive Scale"
-                        scale_targets.append((prod, p_iroas, p_inc_factor, priority_score))
-                    elif p_iroas >= 3.0 and p_inc_factor < 0.40:
-                        quadrant = "💰 Efficiency Max / Cap Budget"
-                        cap_targets.append((prod, p_iroas, p_inc_factor, priority_score))
-                    elif p_iroas < 3.0 and p_inc_factor >= 0.40:
-                        quadrant = "🛠️ Structural Optimization"
-                        optimize_targets.append((prod, p_iroas, p_inc_factor, priority_score))
-                    else:
-                        quadrant = "❌ Defund / Defend Only"
-                        defund_sources.append((prod, p_iroas, p_inc_factor, priority_score))
-                        
-                    blueprint_table.append({
-                        "Category / Product ID": prod,
-                        "True iROAS": f"{p_iroas:.2f}x",
-                        "Ad Incrementality %": f"{p_inc_factor * 100:.1f}%",
-                        "Investment Priority Score": f"{priority_score:.2f}",
-                        "Matrix Allocation Quadrant": quadrant
-                    })
                 
                 # Render the unified matrix overview table
                 st.dataframe(pd.DataFrame(blueprint_table), use_container_width=True)
@@ -315,7 +324,7 @@ if uploaded_file:
                         st.markdown(f"* **Route Capital to `{name}`** (Priority Score: **{score:.2f}** | iROAS: {r:.2f}x | Inc: {f*100:.0f}%)")
                         st.markdown(f"  * *Reallocation Weight Priority:* **{alloc_weight:.1f}%** of all available migration capital.")
                         st.markdown(f"  * *Strategic Focus:* High profit profile matched with open, unsaturated structural headroom.")
-                
+                        
                 # 4. STRUCTURAL OPTIMIZATION QUADRANT (MONITOR & FIX CONVERSION RATIOS)
                 if optimize_targets:
                     st.markdown("### 🛠️ 4. Structural Conversion Optimization (Hold & Improve):")
@@ -323,26 +332,6 @@ if uploaded_file:
                         st.markdown(f"* **Maintain flat ad spend on `{name}`** (Priority Score: **{score:.2f}** | iROAS: {r:.2f}x | Inc: {f*100:.0f}%). Capturing net-new traffic efficiently, but low core landing-page conversion holds back overall iROAS. Optimize content before scaling.")
             else:
                 st.warning("⚠️ Optimization Blueprint requires a minimum of 2 unique categories inside the uploaded data file to build cross-budget migration scenarios.")
-
-            if has_inventory or has_promo:
-                st.subheader("⚠️ Secondary Contextual & Operational Flags")
-                flag_col1, flag_col2 = st.columns(2)
-                
-                with flag_col1:
-                    if low_inventory_alerts:
-                        for alert in low_inventory_alerts:
-                            st.error(alert)
-                    else:
-                        st.write("🟢 **Supply Chain Status:** Nominal. No categories show out-of-stock threats or stock-out performance adjustments.")
-                        
-                with flag_col2:
-                    promo_found = False
-                    for p_name, p_meta in raw_metrics.items():
-                        if p_meta['promo'] and p_meta['iroas'] >= portfolio_iroas:
-                            st.warning(f"🔥 **Exploit Deal Momentum on `{p_name}`:** An active marketing promo is currently running on a category delivering strong incremental value (**{p_meta['iroas']:.2f}x iROAS**). Keep ad bidding high to maximize conversion momentum.")
-                            promo_found = True
-                    if not promo_found:
-                        st.write("ℹ️ **Promo Status:** No active price promotions are currently paired with un-tapped market lift capacity.")
 
             # --- FORMULA EXPLAINER GUIDES (LATEX SYNTAX BUG RESOLVED) ---
             st.header("🧠 Behind the Curtains (How the Math Works)")
