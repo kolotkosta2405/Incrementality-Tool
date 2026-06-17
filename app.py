@@ -252,8 +252,8 @@ if uploaded_file:
                         verdict_desc = f"""
                         * **The Context:** Paid media is highly redundant here. Your brand already dominates the search shelf with an organic presence of **{meta['organic_sov']*100:.1f}% SOV**. 
                         * **Unit Economics Diagnostic:** Your Average Sales Price is **${meta['asp']:,.2f}**, but because ads are overlapping with free listings, each ad-driven item only yields **${meta['iunit_contribution']:,.2f}** in true, net-new value.
-                        * **The Correct Action:** Trim budgets by **15% to 25%**. Shift capital away from standard branded keywords where you are actively paying for clicks you would have earned for free organically. 
-                        * **The Exception:** Restrict remaining spend *exclusively* to **Conquesting spaces** (intercepting competitor traffic where your organic footprint is zero) or a minimal **Brand Defense floor** strictly to block competitors from hijacking your top organic spots. Do not over-fund comfortable branded traffic.
+                        * **The Correct Action:** Trim budgets by **15% to 25%**. Shift capital away from branded and non-branded keywords where you are actively paying for clicks you would have earned for free organically. 
+                        * **The Exception:** Allocate remaining spend exclusively to Conquesting spaces (intercepting competitor traffic where your organic footprint is zero) or a minimal Brand Defense floor if needed strictly to block competitors from hijacking your top organic spots. Do not over-fund comfortable branded traffic.
                         """
                         
                     elif quadrant == "🚀 Aggressive Scale":
