@@ -5,7 +5,7 @@ import numpy as np
 st.set_page_config(page_title="Retail Media Incrementality Engine v9", layout="wide")
 
 st.title("📊 Retail Media Incrementality Engine")
-st.subheader("Advanced Bayesian Causal Inference Dashboard (Unified Model with ASP Economics)")
+st.subheader("S-curve Approach Simulating Prior Weights Dashboard")
 
 st.markdown("""
 This engine treats true media lift from organic cannibalization by replacing rigid rules with a non-linear **Logistic S-Curve**, a **Category-Aware New-to-Brand (NTB)** balancing matrix, and **ASP Unit Economics**.
