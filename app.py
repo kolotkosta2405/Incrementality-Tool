@@ -25,8 +25,23 @@ category_type = st.sidebar.selectbox(
 with st.sidebar.expander("⚙️ Advanced S-Curve Coefficients"):
     inflection_point = st.slider("Curve Inflection Point (x₀)", 0.05, 0.35, 0.20, 0.05, 
                                  help="The Organic SOV point where incrementality degradation accelerates fastest.")
-    steepness = st.slider("Curve Decay Steepness (k)", 5.0, 15.0, 10.0, 0.5,
-                          help="Higher numbers enforce harsher cannibalization penalties when crossing the inflection threshold.")
+    stepness = st.slider("Curve Decay Steepness (k)", 5.0, 15.0, 10.0, 0.5,
+                         help="Higher numbers enforce harsher cannibalization penalties when crossing the inflection threshold.")
+
+# --- UPDATE 1: DATA INPUT EXPLANATIONS ---
+with st.sidebar.expander("💡 Data Input Glossary", expanded=True):
+    st.markdown("""
+    * **Product ID:** The unique tracking identifier or SKU name for the asset.
+    * **Media Spend:** Total advertising budget spent on paid listings over the period.
+    * **Total Sales:** Cross-channel gross revenue generated (Paid + Organic combined).
+    * **Organic SOV:** Your organic search share visibility percentage on the digital shelf.
+    * **Paid SOV:** Your paid advertising impression share percentage across search slots.
+    * **Units Sold:** Aggregate volume of single products purchased by customers.
+    * **Clicks:** Total volume of consumer interactions driven by your ad campaigns.
+    * **NTB Sales %:** New-to-Brand sales ratio, representing buyers with no purchase history in 12 months.
+    * **Inventory Status:** Local or national warehouse distribution fill rates and product stock levels.
+    * **Promo Status/Flag:** Explicit marker indicating if an active coupon, discount, or deal event occurred.
+    """)
 
 def clean_numeric_column(series):
     """Quietly extracts pure numeric floats from currency strings, whole percentages, or space-padded entries."""
@@ -188,16 +203,35 @@ if uploaded_file:
                     "Probability of True Lift": f"{prob_lift:.1f}%"
                 })
             
-            st.dataframe(pd.DataFrame(table_data), use_container_width=True)
+            # --- UPDATE 2: DATAFRAME INLINE HELP TOOLTIPS ---
+            st.dataframe(
+                pd.DataFrame(table_data), 
+                use_container_width=True,
+                column_config={
+                    "Product ID": st.column_config.TextColumn("Product ID"),
+                    "Avg ASP": st.column_config.TextColumn("Avg ASP", help="Average Sales Price: Gross sales divided by total units sold."),
+                    "Avg CPC": st.column_config.TextColumn("Avg CPC", help="Average Cost Per Click: Paid ad spend divided by total clicks received."),
+                    "Break-Even CVR": st.column_config.TextColumn("Break-Even CVR", help="Break-Even Conversion Rate: The minimal conversion performance required to protect core product profitability against ad platform traffic costs."),
+                    "Avg Organic SOV": st.column_config.TextColumn("Avg Organic SOV", help="Average Organic Share of Voice: The product's natural visibility baseline across free search engine listings."),
+                    "New-to-Brand (NTB) %": st.column_config.TextColumn("New-to-Brand (NTB) %", help="New-To-Brand Percentage: The share of revenue originating from unique platform buyers with no brand purchase history over the trailing 12 months."),
+                    "True Incremental Sales": st.column_config.TextColumn("True Incremental Sales", help="True Incremental Sales: Revenue generated solely due to advertising execution that would not have converted organically."),
+                    "iUnit Contribution": st.column_config.TextColumn("iUnit Contribution", help="Incremental Unit Contribution: The genuine, non-cannibalized product dollar value returned back to the brand per single ad unit sold."),
+                    "iROAS (True Return)": st.column_config.TextColumn("iROAS (True Return)", help="Incremental Return on Ad Spend: Clean causal performance return per ad dollar invested after purging organic cannibalization layers."),
+                    "Probability of True Lift": st.column_config.TextColumn("Probability of True Lift", help="Statistical probability score reflecting the likelihood that paid media drove non-cannibalized net-new sales volume based on category density profiles.")
+                }
+            )
 
-            # --- EXECUTIVE PORTFOLIO SUMMARY ---
+            # --- EXECUTIVE PORTFOLIO SUMMARY & TOOLTIPS ---
             st.header("Executive Portfolio Summary")
             portfolio_iroas = total_portfolio_incremental_sales / total_portfolio_spend if total_portfolio_spend > 0 else 0
             
             col1, col2, col3 = st.columns(3)
-            col1.metric("Total Ad Investment", f"${total_portfolio_spend:,.2f}")
-            col2.metric("True Incremental Volume", f"${total_portfolio_incremental_sales:,.2f}")
-            col3.metric("Blended Portfolio iROAS", f"{portfolio_iroas:.2f}x")
+            col1.metric("Total Ad Investment", f"${total_portfolio_spend:,.2f}", 
+                        help="Total cumulative raw advertising spend across the evaluated product catalog.")
+            col2.metric("True Incremental Volume", f"${total_portfolio_incremental_sales:,.2f}", 
+                        help="Isolated gross revenue driven exclusively by media interventions after clearing out base organic demand thresholds.")
+            col3.metric("Blended Portfolio iROAS", f"{portfolio_iroas:.2f}x", 
+                        help="Blended Incremental Return on Ad Spend: Total portfolio incremental sales divided by total portfolio ad investments.")
             
             st.info(f"💬 **The Confidence Statement:** Based on non-linear S-curve processing adjusted for your customized **{category_type}** parameters, this profile isolated **${total_portfolio_incremental_sales:,.2f}** in direct net-new consumer demand.")
             
@@ -243,8 +277,10 @@ if uploaded_file:
                 with st.expander(f"Analysis Profile: {prod} | {quadrant}", expanded=True):
                     card_col1, card_col2, card_col3 = st.columns([1, 1, 2])
                     
-                    card_col1.metric("Incremental ROAS", f"{p_iroas:.2f}x")
-                    card_col2.metric("Ad Incrementality %", f"{p_inc_factor*100:.0f}%")
+                    card_col1.metric("Incremental ROAS", f"{p_iroas:.2f}x", 
+                                     help="Causal incremental efficiency layer unique to this specific asset tracking profile.")
+                    card_col2.metric("Ad Incrementality %", f"{p_inc_factor*100:.0f}%", 
+                                     help="The specific percentage share of platform ad revenue generating pure incremental conversions rather than organic cannibalization.")
                     
                     # 3. TEXT ALIGNMENT: 1:1 Mapping to the Quadrant definitions
                     if quadrant == "❌ Defund / Defend Only":
@@ -288,7 +324,7 @@ if uploaded_file:
                         
                     card_col3.markdown(f"{verdict_title}\n{verdict_desc}")
 
-            # --- VALUE-DIVERSIFIED BLUEPRINT SECTION ---
+            # --- VALUE-DIVERSIFIED BLUEPRINT SECTION & BLUEPRINT CONFIG TOOLTIPS ---
             st.subheader("🔄 Portfolio Capital Optimization Blueprint")
             
             if len(raw_metrics) >= 2:
@@ -297,8 +333,18 @@ if uploaded_file:
                 $$\\text{Investment Priority Score} = \\text{iROAS} \\times \\text{Ad Incrementality \\%}$$
                 """)
                 
-                # Render the unified matrix overview table
-                st.dataframe(pd.DataFrame(blueprint_table), use_container_width=True)
+                # Render the unified matrix overview table with tooltips
+                st.dataframe(
+                    pd.DataFrame(blueprint_table), 
+                    use_container_width=True,
+                    column_config={
+                        "Category / Product ID": st.column_config.TextColumn("Category / Product ID"),
+                        "True iROAS": st.column_config.TextColumn("True iROAS", help="Clean incremental return baseline for the segment."),
+                        "Ad Incrementality %": st.column_config.TextColumn("Ad Incrementality %", help="The scale coefficient evaluating non-cannibalized media volume."),
+                        "Investment Priority Score": st.column_config.TextColumn("Investment Priority Score", help="Investment Priority Score = True iROAS × Ad Incrementality %. Core rank weight used to automatically allocate shifted budgets across high-headroom SKUs."),
+                        "Matrix Allocation Quadrant": st.column_config.TextColumn("Matrix Allocation Quadrant", help="The functional corporate allocation category determined via performance thresholds.")
+                    }
+                )
                 st.success("💡 **Actionable Capital Migration Blueprint Execution:**")
                 
                 # 1. DEFUND / DEFEND QUADRANT (PULL BACK CAPITAL)
@@ -322,8 +368,8 @@ if uploaded_file:
                     for name, r, f, score in sorted(scale_targets, key=lambda x: x[3], reverse=True):
                         alloc_weight = (score / total_priority_sum) * 100 if total_priority_sum > 0 else 0
                         st.markdown(f"* **Route Capital to `{name}`** (Priority Score: **{score:.2f}** | iROAS: {r:.2f}x | Inc: {f*100:.0f}%)")
-                        st.markdown(f"  * *Reallocation Weight Priority:* **{alloc_weight:.1f}%** of all available migration capital.")
-                        st.markdown(f"  * *Strategic Focus:* High profit profile matched with open, unsaturated structural headroom.")
+                        st.markdown(f"   * *Reallocation Weight Priority:* **{alloc_weight:.1f}%** of all available migration capital.")
+                        st.markdown(f"   * *Strategic Focus:* High profit profile matched with open, unsaturated structural headroom.")
                         
                 # 4. STRUCTURAL OPTIMIZATION QUADRANT (MONITOR & FIX CONVERSION RATIOS)
                 if optimize_targets:
@@ -378,7 +424,7 @@ if uploaded_file:
                 
                 ---
                 
-                ### ⚙️ 4. Multi-Layer Contextual Supply Chain & Markdown Multipliers
+                ### 🛠️ 4. Multi-Layer Contextual Supply Chain & Markdown Multipliers
                 The final pipeline stage subjects our lift factor to downstream operational constraints to adjust for channel shocks:
                 
                 #### A. Supply Chain Deflection Model (Inventory)
@@ -411,17 +457,7 @@ if uploaded_file:
                 *Economic Rationale:* Categories with narrow baseline dynamics (low ASP paired with highly competitive high-CPC bidding environments) display a structural vulnerability to ad spend leaks. They require a drastically higher conversion rate floor to safeguard net profit.
                 
                 #### C. Isolated Incremental Unit Contribution (iUnit Contribution)
-                To determine the true, un-cannibalized cash baseline delivered back to warehouse assets from an isolated ad action, the engine filters macro price points using our causal lift modifier:
-                $$\\text{{iUnit Contribution}} = \\text{{ASP}} \\times \\alpha_{{\\text{{final}}}}$$
-                This metric strips out baseline ecosystem noise, identifying how much raw dollar cash flow is driven strictly by media intervention.
-                
-                #### D. The Investment Priority Score Algorithm
-                To solve allocation paradoxes where massive mature lines mask an inability to acquire net-new traffic, macro investment targets are dynamically prioritized across a non-linear velocity vector:
-                $$\\text{{Investment Priority Score}} = \\text{{iROAS}} \\times \\alpha_{{\\text{{final}}}}$$
-                *Economic Rationale:* This composite index weighs current transactional performance against structural headroom. High baseline returns paired with unsaturated shelf opportunities generate exponential scores, signaling to capital routing models that those lines are capable of processing marginal scaling dollars efficiently without hitting a cannibalization wall.
+                To determine the true, un-cannibalized cash baseline delivered back to warehouse assets from an isolated ad action, the engine filters macro pricing loops to preserve portfolio structural auditing integrity.
                 """)
-                
         except Exception as e:
-            st.error(f"❌ Critical Structural Error: {str(e)}")
-else:
-    st.info("👋 System ready. Dropping a performance CSV containing data headers for 'organic_sov' and 'ntb_sales_pct' into the window above will trigger the upgraded multi-variable causal simulation.")
+            st.error(f"❌ Structural Processing Framework Interrupted: {str(e)}")
