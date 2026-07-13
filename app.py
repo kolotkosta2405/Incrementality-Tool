@@ -25,7 +25,7 @@ category_type = st.sidebar.selectbox(
 with st.sidebar.expander("⚙️ Advanced S-Curve Coefficients"):
     inflection_point = st.slider("Curve Inflection Point (x₀)", 0.05, 0.35, 0.20, 0.05, 
                                  help="The Organic SOV point where incrementality degradation accelerates fastest.")
-    stepness = st.slider("Curve Decay Steepness (k)", 5.0, 15.0, 10.0, 0.5,
+    steepness = st.slider("Curve Decay Steepness (k)", 5.0, 15.0, 10.0, 0.5,
                          help="Higher numbers enforce harsher cannibalization penalties when crossing the inflection threshold.")
 
 # --- UPDATE 1: DATA INPUT EXPLANATIONS ---
